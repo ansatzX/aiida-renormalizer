@@ -1,0 +1,60 @@
+"""Driver script for TtnsExpectationCalcJob.
+
+Compute expectation value <ttns|ttno|ttns>.
+"""
+import json
+import numpy as np
+from renormalizer.tn.treebase import BasisTree
+from renormalizer.tn.tree import TTNS, TTNO
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_basis_tree(input_file='input_basis_tree.npz'):
+    """Load a BasisTree from .npz file."""
+    return BasisTree.load(input_file)
+
+def load_ttns(input_file='initial_ttns.npz', basis_tree=None):
+    """Load a TTNS from .npz file."""
+    if basis_tree is None:
+        raise ValueError("BasisTree is required to load TTNS")
+    return TTNS.load(basis_tree, input_file)
+
+def load_ttno(input_file='initial_ttno.npz', basis_tree=None):
+    """Load a TTNO from .npz file."""
+    if basis_tree is None:
+        raise ValueError("BasisTree is required to load TTNO")
+    return TTNO.load(basis_tree, input_file)
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    basis_tree = load_basis_tree()
+    ttns = load_ttns('initial_ttns.npz', basis_tree)
+    ttno = load_ttno('initial_ttno.npz', basis_tree)
+
+    # Compute expectation value
+    expectation_value = ttns.expectation(ttno)
+
+    # Prepare output parameters
+    output_params = {
+        'calcjob_class': 'TtnsExpectationCalcJob',
+        'calc_type': 'expectation',
+        'expectation_value': float(expectation_value.real) if np.iscomplexobj(expectation_value) else float(expectation_value),
+        'expectation_value_complex': [float(expectation_value.real), float(expectation_value.imag)] if np.iscomplexobj(expectation_value) else None,
+        'n_nodes': len(ttns),
+    }
+    save_output_parameters(output_params)

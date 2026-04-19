@@ -1,0 +1,120 @@
+"""Driver script for TtnsEvolveCalcJob.
+
+TTN time evolution using various methods (TDVP, etc.).
+"""
+import json
+import numpy as np
+from renormalizer.tn.treebase import BasisTree
+from renormalizer.tn.tree import TTNS, TTNO
+from renormalizer.parameter import EvolveConfig
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_basis_tree(input_file='input_basis_tree.npz'):
+    """Load a BasisTree from .npz file."""
+    return BasisTree.load(input_file)
+
+def load_ttns(input_file='initial_ttns.npz', basis_tree=None):
+    """Load a TTNS from .npz file."""
+    if basis_tree is None:
+        raise ValueError("BasisTree is required to load TTNS")
+    return TTNS.load(basis_tree, input_file)
+
+def load_ttno(input_file='input_ttno.npz', basis_tree=None):
+    """Load a TTNO from .npz file."""
+    if basis_tree is None:
+        raise ValueError("BasisTree is required to load TTNO")
+    return TTNO.load(basis_tree, input_file)
+
+def load_config(input_file='input_config.json'):
+    """Load a Reno config object from AiiDA ConfigData export."""
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        # Reconstruct EvolveConfig from data
+        config_class = data.get('config_class', 'EvolveConfig')
+        fields = data.get('fields', {})
+        return EvolveConfig(**fields)
+    except FileNotFoundError:
+        # Return default config
+        from renormalizer.parameter import EvolveConfig
+        return EvolveConfig()
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+def save_ttns(ttns, output_file='output_ttns.npz', description=''):
+    """Save TTNS to .npz with description field."""
+    ttns.dump(output_file.rstrip('.npz'))
+
+    # Add description field
+    with np.load(output_file, allow_pickle=True) as data:
+        arrays = dict(data)
+    arrays['description'] = description
+    np.savez(output_file, **arrays)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    basis_tree = load_basis_tree()
+    ttns = load_ttns('initial_ttns.npz', basis_tree)
+    ttno = load_ttno('input_ttno.npz', basis_tree)
+    config = load_config()
+
+    # Apply config to TTNS
+    ttns.evolve_config = config
+
+    # Get evolution parameters
+    nsteps = config.nsteps
+    dt = config.dt
+    evolve_method = config.evolve_method
+
+    # Track energy during evolution
+    energies = []
+    times = []
+
+    # Initial energy
+    E0 = ttns.expectation(ttno)
+    energies.append(float(E0))
+    times.append(0.0)
+
+    # Time evolution loop
+    for istep in range(nsteps):
+        # Evolve one step
+        ttns.evolve(ttno, dt, normalize=True)
+
+        # Compute energy
+        E = ttns.expectation(ttno)
+        energies.append(float(E))
+        times.append((istep + 1) * dt)
+
+    # Prepare output parameters
+    output_params = {
+        'calcjob_class': 'TtnsEvolveCalcJob',
+        'calc_type': 'time_evolution',
+        'nsteps': nsteps,
+        'dt': dt,
+        'evolve_method': str(evolve_method),
+        'energy_trajectory': energies,
+        'time_points': times,
+        'initial_energy': energies[0],
+        'final_energy': energies[-1],
+        'bond_dims': [int(d) for d in ttns.bond_dims],
+        'n_nodes': len(ttns),
+    }
+    save_output_parameters(output_params)
+
+    # Save evolved TTNS with description
+    description = f'TTN evolved state, final E={energies[-1]:.10f}'
+    save_ttns(ttns, 'output_ttns.npz', description)

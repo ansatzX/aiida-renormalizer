@@ -1,0 +1,140 @@
+"""Driver script for CorrectionVectorCalcJob.
+
+Frequency-domain spectrum calculation using correction vector method.
+"""
+import json
+import numpy as np
+from renormalizer.model import Model
+from renormalizer.mps import Mps, Mpo
+from renormalizer.cv import SpectraZtCV, SpectraFtCV, batch_run
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_mps(input_file='initial_mps.npz', model=None):
+    """Load an MPS from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPS")
+    return Mps.load(model, input_file)
+
+def load_mpo(input_file='initial_mpo.npz', model=None):
+    """Load an MPO from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPO")
+    return Mpo.load(model, input_file)
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+
+    # Load CV parameters
+    with open('input_cv_params.json', 'r') as f:
+        params = json.load(f)
+
+    eta = params['eta']
+    m_max = params.get('m_max', 100)
+    method = params.get('method', '1site')
+    rtol = params.get('rtol', 1e-5)
+    n_cores = params.get('n_cores', 1)
+    spectratype = params.get('spectratype')
+
+    # Load frequencies
+    frequencies = np.load('frequencies.npy')
+
+    # Load procedure (if provided)
+    {% if has_procedure_cv %}
+    with open('input_procedure_cv.json', 'r') as f:
+        procedure_cv = json.load(f)
+    {% else %}
+    procedure_cv = None
+    {% endif %}
+
+    # Load MPO (if provided)
+    {% if has_mpo %}
+    mpo = load_mpo('initial_mpo.npz', model)
+    {% else %}
+    mpo = Mpo(model)
+    {% endif %}
+
+    # Load initial MPS (if provided)
+    {% if has_initial_mps %}
+    initial_mps = load_mps('initial_mps.npz', model)
+    {% else %}
+    initial_mps = None
+    {% endif %}
+
+    # Create correction vector calculator
+    # For zero temperature
+    cv_calc = SpectraZtCV(
+        model,
+        spectratype,
+        m_max,
+        eta,
+        h_mpo=mpo,
+        method=method,
+        procedure_cv=procedure_cv,
+        rtol=rtol,
+    )
+
+    # Run calculation
+    try:
+        # Run batch calculation over frequencies
+        spectra = batch_run(frequencies.tolist(), n_cores, cv_calc)
+
+        # Prepare output
+        output_params = {
+            'calcjob_class': 'CorrectionVectorCalcJob',
+            'calc_type': 'spectra_cv',
+            'spectratype': spectratype,
+            'eta': eta,
+            'm_max': m_max,
+            'method': method,
+            'frequencies': frequencies.tolist(),
+            'spectra': spectra,
+            'n_frequencies': len(frequencies),
+            'converged': True,
+        }
+
+        save_output_parameters(output_params)
+
+    except Exception as e:
+        import traceback
+        output_params = {
+            'calcjob_class': 'CorrectionVectorCalcJob',
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'converged': False,
+        }
+        save_output_parameters(output_params)
+        raise

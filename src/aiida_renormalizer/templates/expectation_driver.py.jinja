@@ -1,0 +1,73 @@
+"""Driver script for ExpectationCalcJob.
+
+Computes expectation value <mps|mpo|mps>.
+"""
+import json
+import numpy as np
+from renormalizer.model import Model
+from renormalizer.mps import Mps, MpDm, Mpo
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_mps(input_file='initial_mps.npz', model=None):
+    """Load an MPS/MpDm from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPS")
+    return Mps.load(model, input_file)
+
+def load_mpo(input_file='initial_mpo.npz', model=None):
+    """Load an MPO from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPO")
+    return Mpo.load(model, input_file)
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+    mps = load_mps('initial_mps.npz', model)
+    mpo = load_mpo('initial_mpo.npz', model)
+
+    # Calculate expectation value
+    expectation = mps.expectation(mpo)
+
+    # Save outputs
+    output_params = {
+        'calcjob_class': 'ExpectationCalcJob',
+        'expectation': float(expectation.real) if np.isreal(expectation) else complex(expectation),
+        'n_sites': len(mps),
+        'bond_dims': [int(d) for d in mps.bond_dims],
+        'converged': True,
+    }
+    save_output_parameters(output_params)

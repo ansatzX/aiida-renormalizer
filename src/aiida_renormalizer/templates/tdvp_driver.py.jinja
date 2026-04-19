@@ -1,0 +1,163 @@
+"""Driver script for TDVPCalcJob.
+
+TDVP real-time evolution with trajectory output.
+"""
+import json
+import numpy as np
+from renormalizer.model import Model
+from renormalizer.mps import Mps, Mpo
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_mps(input_file='initial_mps.npz', model=None):
+    """Load an MPS/MpDm from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPS")
+    return Mps.load(model, input_file)
+
+def load_mpo(input_file='initial_mpo.npz', model=None):
+    """Load an MPO from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPO")
+    return Mpo.load(model, input_file)
+
+def load_config(input_file='input_config.json'):
+    """Load a Reno config object from AiiDA ConfigData export."""
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        # Reconstruct EvolveConfig from data
+        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        config_class = data.get('config_class', 'EvolveConfig')
+        fields = data.get('fields', {})
+        # Convert method string to enum if present
+        if 'method' in fields and isinstance(fields['method'], str):
+            fields['method'] = EvolveMethod[fields['method']]
+        return EvolveConfig(**fields)
+    except FileNotFoundError:
+        # Return default config with TDVP method
+        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        return EvolveConfig(method=EvolveMethod.tdvp_ps)
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+def save_mps(mps, output_file='output_mps.npz', description=''):
+    """Save MPS/MpDm to .npz with description field."""
+    mps.dump(output_file.rstrip('.npz'))
+
+    # Add description field
+    with np.load(output_file, allow_pickle=True) as data:
+        arrays = dict(data)
+    arrays['description'] = description
+    np.savez(output_file, **arrays)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+    mpo = load_mpo('initial_mpo.npz', model)
+    config = load_config()
+
+    # Load evolution parameters
+    with open('input_evolution_params.json', 'r') as f:
+        evo_params = json.load(f)
+
+    total_time = evo_params['total_time']
+    dt = evo_params['dt']
+    trajectory_interval = evo_params.get('trajectory_interval', 1)
+
+    # Load initial MPS
+    mps = load_mps('initial_mps.npz', model)
+
+    # Compute number of steps
+    n_steps = int(total_time / dt)
+
+    # Trajectory storage
+    trajectory_times = []
+    trajectory_energies = []
+    trajectory_bond_dims = []
+
+    # Perform real-time evolution
+    current_mps = mps
+    initial_energy = current_mps.expectation(mpo).real
+
+    for step in range(n_steps):
+        # Evolve by dt (real time)
+        current_mps = current_mps.evolve(mpo, dt, normalize=False)
+
+        # Record trajectory at intervals
+        if step % trajectory_interval == 0:
+            t = step * dt
+            energy = current_mps.expectation(mpo).real
+            bond_dims = [int(d) for d in current_mps.bond_dims]
+
+            trajectory_times.append(t)
+            trajectory_energies.append(energy)
+            trajectory_bond_dims.append(bond_dims)
+
+    # Final state
+    final_mps = current_mps
+    final_energy = trajectory_energies[-1]
+
+    # Check energy conservation
+    energy_drift = abs(final_energy - initial_energy)
+
+    output_params = {
+        'calcjob_class': 'TDVPCalcJob',
+        'calc_type': 'real_time_evolution',
+        'total_time': total_time,
+        'dt': dt,
+        'n_steps': n_steps,
+        'trajectory_times': trajectory_times,
+        'trajectory_energies': trajectory_energies,
+        'initial_energy': initial_energy,
+        'final_energy': final_energy,
+        'energy_drift': energy_drift,
+        'bond_dims': [int(d) for d in final_mps.bond_dims],
+        'bond_dims_mean': float(final_mps.bond_dims_mean),
+        'n_sites': len(final_mps),
+        'converged': energy_drift < 1e-4,  # Energy conservation threshold
+    }
+    save_output_parameters(output_params)
+
+    # Save final MPS with description
+    description = f'TDVP evolved MPS, T={total_time:.3f}, E_final={final_energy:.10f}'
+    save_mps(final_mps, 'output_mps.npz', description)
+
+    # Save trajectory as separate file
+    np.savez(
+        'trajectory.npz',
+        times=np.array(trajectory_times),
+        energies=np.array(trajectory_energies),
+        # Bond dims stored as object array (variable length)
+        bond_dims=np.array(trajectory_bond_dims, dtype=object),
+    )

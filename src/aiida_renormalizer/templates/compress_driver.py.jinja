@@ -1,0 +1,99 @@
+"""Driver script for CompressCalcJob.
+
+Compresses MPS/MpDm to reduce bond dimension.
+"""
+import json
+import numpy as np
+from renormalizer.model import Model
+from renormalizer.mps import Mps, MpDm
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_mps(input_file='initial_mps.npz', model=None):
+    """Load an MPS/MpDm from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPS")
+    return Mps.load(model, input_file)
+
+def load_config(input_file='input_config.json'):
+    """Load a Reno config object from AiiDA ConfigData export."""
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        # Reconstruct CompressConfig from data
+        from renormalizer.parameter import CompressConfig
+        config_class = data.get('config_class', 'CompressConfig')
+        fields = data.get('fields', {})
+        return CompressConfig(**fields)
+    except FileNotFoundError:
+        # Return default config
+        from renormalizer.parameter import CompressConfig
+        return CompressConfig()
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+def save_mps(mps, output_file='output_mps.npz', description=''):
+    """Save MPS/MpDm to .npz with description field."""
+    mps.dump(output_file.rstrip('.npz'))
+
+    # Add description field
+    with np.load(output_file, allow_pickle=True) as data:
+        arrays = dict(data)
+    arrays['description'] = description
+    np.savez(output_file, **arrays)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+    mps = load_mps('initial_mps.npz', model)
+    config = load_config()
+
+    # Store initial bond dimensions
+    initial_bond_dims = [int(d) for d in mps.bond_dims]
+
+    # Compress MPS
+    mps.compress(config)
+
+    # Save outputs
+    output_params = {
+        'calcjob_class': 'CompressCalcJob',
+        'initial_bond_dims': initial_bond_dims,
+        'final_bond_dims': [int(d) for d in mps.bond_dims],
+        'n_sites': len(mps),
+        'converged': True,
+    }
+    save_output_parameters(output_params)
+
+    # Save compressed MPS with description
+    description = 'Compressed MPS from CompressCalcJob'
+    save_mps(mps, 'output_mps.npz', description)

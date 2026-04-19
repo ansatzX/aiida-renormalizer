@@ -1,0 +1,105 @@
+# aiida-renormalizer/pyproject.toml
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiida-renormalizer"
+version = "0.1.0"
+description = "AiiDA plugin for the Renormalizer tensor network package"
+requires-python = ">=3.10"
+dependencies = [
+    "aiida-core>=2.6,<3",
+    "renormalizer",
+    "numpy<2.0",
+    "jinja2>=3",  # Required for CalcJob driver template rendering
+    "click>=8",  # Required for CLI entry points
+    "print-tree2",  # Required for TTN functionality
+    "tomli>=2; python_version<'3.11'",  # TOML parser for py<=3.11
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+]
+
+[project.entry-points."aiida.data"]
+"reno.model"  = "aiida_renormalizer.data.model:ModelData"
+"reno.mps"    = "aiida_renormalizer.data.mps:MpsData"
+"reno.mpo"    = "aiida_renormalizer.data.mpo:MpoData"
+"reno.op"     = "aiida_renormalizer.data.op:OpData"
+"reno.basis"  = "aiida_renormalizer.data.basis:BasisSetData"
+"reno.config" = "aiida_renormalizer.data.config:ConfigData"
+"reno.basis_tree" = "aiida_renormalizer.data.basis_tree:BasisTreeData"
+"reno.ttns"   = "aiida_renormalizer.data.ttns:TTNSData"
+"reno.ttno"   = "aiida_renormalizer.data.ttno:TtnoData"
+
+[project.entry-points."aiida.calculations"]
+# L1 Atomic CalcJobs
+"reno.build_mpo" = "aiida_renormalizer.calculations.basic.build_mpo:BuildMpoCalcJob"
+"reno.expectation" = "aiida_renormalizer.calculations.basic.expectation:ExpectationCalcJob"
+"reno.compress" = "aiida_renormalizer.calculations.basic.compress:CompressCalcJob"
+# L1.5 LEGO CalcJobs
+"reno.compute_occupations" = "aiida_renormalizer.calculations.lego.occupations:ComputeOccupationsCalcJob"
+"reno.compute_msd" = "aiida_renormalizer.calculations.lego.msd:ComputeMsdCalcJob"
+# L2 Composite CalcJobs
+"reno.dmrg" = "aiida_renormalizer.calculations.composite.dmrg:DMRGCalcJob"
+"reno.imag_time" = "aiida_renormalizer.calculations.composite.imag_time:ImagTimeCalcJob"
+"reno.tdvp" = "aiida_renormalizer.calculations.composite.tdvp:TDVPCalcJob"
+"reno.thermal_prop" = "aiida_renormalizer.calculations.composite.thermal_prop:ThermalPropCalcJob"
+"reno.property" = "aiida_renormalizer.calculations.composite.property:PropertyCalcJob"
+# L2 Spectra and Transport CalcJobs
+"reno.spectra_zero_t" = "aiida_renormalizer.calculations.spectra.spectra_zero_t:SpectraZeroTCalcJob"
+"reno.spectra_finite_t" = "aiida_renormalizer.calculations.spectra.spectra_finite_t:SpectraFiniteTCalcJob"
+"reno.kubo" = "aiida_renormalizer.calculations.spectra.kubo:KuboCalcJob"
+"reno.correction_vector" = "aiida_renormalizer.calculations.spectra.correction_vector:CorrectionVectorCalcJob"
+"reno.charge_diffusion" = "aiida_renormalizer.calculations.spectra.charge_diffusion:ChargeDiffusionCalcJob"
+"reno.spectral_function" = "aiida_renormalizer.calculations.spectra.spectral_function:SpectralFunctionCalcJob"
+# L3 Scripted CalcJob
+"reno.script" = "aiida_renormalizer.calculations.scripted:RenoScriptCalcJob"
+# TTN CalcJobs
+"reno.ttn_optimize" = "aiida_renormalizer.calculations.ttn.optimize_ttns:OptimizeTtnsCalcJob"
+"reno.ttns_evolve" = "aiida_renormalizer.calculations.ttn.ttns_evolve:TtnsEvolveCalcJob"
+"reno.ttns_expectation" = "aiida_renormalizer.calculations.ttn.observables:TtnsExpectationCalcJob"
+"reno.ttns_entropy" = "aiida_renormalizer.calculations.ttn.observables:TtnsEntropyCalcJob"
+"reno.ttns_mutual_info" = "aiida_renormalizer.calculations.ttn.observables:TtnsMutualInfoCalcJob"
+"reno.ttns_rdm" = "aiida_renormalizer.calculations.ttn.observables:TtnsRdmCalcJob"
+
+[project.entry-points."aiida.parsers"]
+"reno.base" = "aiida_renormalizer.parsers.reno_base:RenoBaseParser"
+"reno.scripted" = "aiida_renormalizer.parsers.scripted:ScriptedParser"
+
+[project.entry-points."aiida.command"]
+"reno" = "aiida_renormalizer.cli.cmd_reno:reno"
+
+[project.entry-points."aiida.workflows"]
+# L4 WorkChains - Core (M6)
+"reno.restart" = "aiida_renormalizer.workchains.restart:RenoRestartWorkChain"
+"reno.time_evolution" = "aiida_renormalizer.workchains.time_evolution:TimeEvolutionWorkChain"
+"reno.ground_state" = "aiida_renormalizer.workchains.ground_state:GroundStateWorkChain"
+"reno.absorption" = "aiida_renormalizer.workchains.absorption:AbsorptionWorkChain"
+"reno.convergence" = "aiida_renormalizer.workchains.convergence:ConvergenceWorkChain"
+# L4 WorkChains - Extended (M7)
+"reno.thermal_state" = "aiida_renormalizer.workchains.thermal:ThermalStateWorkChain"
+"reno.kubo_transport" = "aiida_renormalizer.workchains.transport:KuboTransportWorkChain"
+"reno.custom_pipeline" = "aiida_renormalizer.workchains.custom:CustomPipelineWorkChain"
+"reno.parameter_sweep" = "aiida_renormalizer.workchains.sweep:ParameterSweepWorkChain"
+"reno.temperature_sweep" = "aiida_renormalizer.workchains.sweep:TemperatureSweepWorkChain"
+"reno.bond_dimension_sweep" = "aiida_renormalizer.workchains.sweep:BondDimensionSweepWorkChain"
+"reno.frequency_sweep" = "aiida_renormalizer.workchains.sweep:FrequencySweepWorkChain"
+# L4 WorkChains - CV + Advanced Dynamics (M8)
+"reno.correction_vector" = "aiida_renormalizer.workchains.correction_vector:CorrectionVectorWorkChain"
+"reno.charge_diffusion" = "aiida_renormalizer.workchains.charge_diffusion:ChargeDiffusionWorkChain"
+"reno.spin_boson" = "aiida_renormalizer.workchains.spin_boson:SpinBosonWorkChain"
+"reno.vibronic" = "aiida_renormalizer.workchains.vibronic:VibronicWorkChain"
+# TTN WorkChains (M11)
+"reno.ttn_ground_state" = "aiida_renormalizer.workchains.ttn_ground_state:TtnGroundStateWorkChain"
+"reno.ttn_time_evolution" = "aiida_renormalizer.workchains.ttn_time_evolution:TtnTimeEvolutionWorkChain"
+"reno.ttn_mps_comparison" = "aiida_renormalizer.workchains.ttn_mps_comparison:TtnMpsComparisonWorkChain"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

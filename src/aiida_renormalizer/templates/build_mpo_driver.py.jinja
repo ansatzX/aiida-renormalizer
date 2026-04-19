@@ -1,0 +1,81 @@
+"""Driver script for BuildMpoCalcJob.
+
+Constructs an MPO from a symbolic operator (Op or OpSum).
+"""
+import json
+import numpy as np
+from renormalizer.model import Model
+from renormalizer.mps import Mpo
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_op(input_file='input_op.json'):
+    """Load symbolic operator from OpData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    return deserialize_opsum(data['op'])
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+def save_mpo(mpo, output_file='output_mpo.npz', description=''):
+    """Save MPO to .npz with description field."""
+    mpo.dump(output_file.rstrip('.npz'))
+
+    # Add description field
+    with np.load(output_file, allow_pickle=True) as data:
+        arrays = dict(data)
+    arrays['description'] = description
+    np.savez(output_file, **arrays)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+    op = load_op('input_op.json')
+
+    # Build MPO from operator
+    mpo = Mpo(model, op)
+
+    # Save outputs
+    output_params = {
+        'calcjob_class': 'BuildMpoCalcJob',
+        'n_sites': len(mpo),
+        'bond_dims': [int(d) for d in mpo.bond_dims],
+        'converged': True,
+    }
+    save_output_parameters(output_params)
+
+    # Save MPO with description
+    description = 'MPO from BuildMpoCalcJob'
+    save_mpo(mpo, 'output_mpo.npz', description)

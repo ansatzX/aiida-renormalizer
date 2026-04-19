@@ -1,0 +1,172 @@
+"""Driver script for ChargeDiffusionCalcJob.
+
+Charge diffusion dynamics simulation.
+"""
+import json
+import numpy as np
+from renormalizer.model import Model, HolsteinModel
+from renormalizer.mps import Mps, Mpo, MpDm
+from renormalizer.transport import ChargeDiffusionDynamics, InitElectron
+from renormalizer.utils import Quantity, EvolveConfig, CompressConfig
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_model(input_file='input_model.json'):
+    """Load a Reno Model from AiiDA ModelData export."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    from aiida_renormalizer.data.basis_registry import deserialize_basis
+    basis = [deserialize_basis(b) for b in data['basis']]
+
+    from aiida_renormalizer.data.op import deserialize_opsum
+    ham_terms = deserialize_opsum(data['ham_opsum'])
+
+    dipole = None
+    if 'dipole' in data:
+        dipole = deserialize_opsum(data['dipole'])
+
+    return Model(basis, ham_terms, dipole=dipole)
+
+def load_mps(input_file='initial_thermal_state.npz', model=None):
+    """Load an MPS/MpDm from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPS")
+    return Mps.load(model, input_file)
+
+def load_mpo(input_file='initial_mpo.npz', model=None):
+    """Load an MPO from .npz file."""
+    if model is None:
+        raise ValueError("Model is required to load MPO")
+    return Mpo.load(model, input_file)
+
+def load_config(input_file='input_config.json'):
+    """Load a Reno EvolveConfig."""
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        from renormalizer.parameter import EvolveConfig
+        fields = data.get('fields', {})
+        return EvolveConfig(**fields)
+    except FileNotFoundError:
+        from renormalizer.parameter import EvolveConfig
+        return EvolveConfig()
+
+def load_compress_config(input_file='input_compress_config.json'):
+    """Load compress config."""
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        from renormalizer.parameter import CompressConfig
+        fields = data.get('fields', {})
+        return CompressConfig(**fields)
+    except FileNotFoundError:
+        from renormalizer.parameter import CompressConfig
+        return CompressConfig()
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    model = load_model()
+
+    # Load diffusion parameters
+    with open('input_diffusion_params.json', 'r') as f:
+        params = json.load(f)
+
+    temperature = params.get('temperature', 0.0)
+    init_electron_str = params.get('init_electron', 'relaxed')
+    stop_at_edge = params.get('stop_at_edge', True)
+    rdm = params.get('rdm', False)
+
+    # Convert init_electron string to enum
+    init_electron = InitElectron[init_electron_str]
+
+    # Load configs
+    config = load_config()
+    compress_config = load_compress_config()
+
+    # Load MPO (if provided)
+    {% if has_mpo %}
+    mpo = load_mpo('initial_mpo.npz', model)
+    {% else %}
+    mpo = None
+    {% endif %}
+
+    # Load initial thermal state (if provided)
+    {% if has_initial_mps %}
+    initial_thermal_state = load_mps('initial_thermal_state.npz', model)
+    {% else %}
+    initial_thermal_state = None
+    {% endif %}
+
+    # Create charge diffusion calculator
+    diffusion_calc = ChargeDiffusionDynamics(
+        model,
+        temperature=Quantity(temperature, 'au'),
+        compress_config=compress_config,
+        evolve_config=config,
+        stop_at_edge=stop_at_edge,
+        init_electron=init_electron,
+        rdm=rdm,
+    )
+
+    # Run calculation
+    try:
+        # Run time evolution
+        diffusion_calc.evolve(None, None, None)
+
+        # Get results
+        time_series = diffusion_calc.evolve_times
+        r_square = diffusion_calc.r_square_array
+        e_occupations = diffusion_calc.e_occupations_array
+        ph_occupations = diffusion_calc.ph_occupations_array
+        energies = diffusion_calc.energies
+
+        # Prepare output
+        output_params = {
+            'calcjob_class': 'ChargeDiffusionCalcJob',
+            'calc_type': 'transport',
+            'temperature': temperature,
+            'init_electron': init_electron_str,
+            'stop_at_edge': stop_at_edge,
+            'rdm': rdm,
+            'time_series': [float(t) for t in time_series],
+            'r_square_array': [float(r) for r in r_square],
+            'e_occupations_array': e_occupations.tolist(),
+            'ph_occupations_array': ph_occupations.tolist(),
+            'energies': [float(e) for e in energies],
+            'converged': True,
+        }
+
+        # Add RDM-related outputs if available
+        if rdm and len(diffusion_calc.k_occupations_array) > 0:
+            output_params['k_occupations_array'] = diffusion_calc.k_occupations_array.tolist()
+            output_params['coherent_length_array'] = [float(c) for c in diffusion_calc.coherent_length_array]
+            output_params['eph_vn_entropy_array'] = [float(s) for s in diffusion_calc.eph_vn_entropy_array]
+
+        save_output_parameters(output_params)
+
+    except Exception as e:
+        import traceback
+        output_params = {
+            'calcjob_class': 'ChargeDiffusionCalcJob',
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'converged': False,
+        }
+        save_output_parameters(output_params)
+        raise

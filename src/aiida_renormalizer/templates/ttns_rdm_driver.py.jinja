@@ -1,0 +1,83 @@
+"""Driver script for TtnsRdmCalcJob.
+
+Compute reduced density matrix for specific nodes.
+"""
+import json
+import numpy as np
+from renormalizer.tn.treebase import BasisTree
+from renormalizer.tn.tree import TTNS
+
+# ============================================================================
+# INPUT LOADING UTILITIES (from base template)
+# ============================================================================
+
+def load_basis_tree(input_file='input_basis_tree.npz'):
+    """Load a BasisTree from .npz file."""
+    return BasisTree.load(input_file)
+
+def load_ttns(input_file='initial_ttns.npz', basis_tree=None):
+    """Load a TTNS from .npz file."""
+    if basis_tree is None:
+        raise ValueError("BasisTree is required to load TTNS")
+    return TTNS.load(basis_tree, input_file)
+
+# ============================================================================
+# OUTPUT SERIALIZATION UTILITIES (from base template)
+# ============================================================================
+
+def save_output_parameters(params, output_file='output_parameters.json'):
+    """Save calculation outputs to JSON."""
+    with open(output_file, 'w') as f:
+        json.dump(params, f, indent=2)
+
+def save_rdm(rdm_dict, output_file='output_rdm.npz'):
+    """Save RDMs to .npz file."""
+    np.savez(output_file, **rdm_dict)
+
+# ============================================================================
+# MAIN CALCULATION
+# ============================================================================
+
+if __name__ == '__main__':
+    # Load inputs
+    basis_tree = load_basis_tree()
+    ttns = load_ttns('initial_ttns.npz', basis_tree)
+
+    # Load node indices
+    with open('input_node_indices.json', 'r') as f:
+        data = json.load(f)
+    node_indices = data['node_indices']
+
+    # Compute RDM for each specified node
+    rdm_dict = {}
+    rdm_info = {}
+
+    for node_idx in node_indices:
+        node = ttns.node_list[node_idx]
+
+        # Compute 1-RDM for the node
+        # Note: This requires implementation in Renormalizer
+        # Placeholder: use identity matrix as dummy RDM
+        dim = node.shape[0]  # Physical dimension
+        rdm = np.eye(dim, dtype=complex) / dim
+
+        rdm_dict[f'rdm_node_{node_idx}'] = rdm
+        rdm_info[f'node_{node_idx}'] = {
+            'shape': list(rdm.shape),
+            'trace': float(np.trace(rdm)),
+            'is_hermitian': bool(np.allclose(rdm, rdm.conj().T)),
+        }
+
+    # Save RDMs
+    save_rdm(rdm_dict, 'output_rdm.npz')
+
+    # Prepare output parameters
+    output_params = {
+        'calcjob_class': 'TtnsRdmCalcJob',
+        'calc_type': 'rdm',
+        'node_indices': node_indices,
+        'rdm_info': rdm_info,
+        'n_nodes': len(ttns),
+        'note': 'RDM computation requires implementation in Renormalizer (placeholder used)',
+    }
+    save_output_parameters(output_params)
