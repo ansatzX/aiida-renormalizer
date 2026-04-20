@@ -1,6 +1,5 @@
 """Unit tests for RenoRestartWorkChain."""
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from aiida import orm
 from aiida.engine import ProcessHandlerReport
@@ -47,19 +46,6 @@ def _make_restart_workchain():
     extras_store["considered_handlers"] = [[]]
 
     return wc, TestRestartWorkChain
-
-
-def test_restart_workchain_setup():
-    """Test RenoRestartWorkChain setup method."""
-    # Create a concrete test class
-    class TestRestartWorkChain(RenoRestartWorkChain):
-        _process_class = DMRGCalcJob
-
-    # Note: Cannot instantiate directly in test, just verify the class structure
-    assert hasattr(TestRestartWorkChain, "setup")
-    assert hasattr(TestRestartWorkChain, "results")
-    assert hasattr(TestRestartWorkChain, "handle_not_converged")
-    assert hasattr(TestRestartWorkChain, "handle_physical_validation")
 
 
 def test_handle_not_converged_with_config():

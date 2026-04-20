@@ -12,20 +12,29 @@ from aiida.manage import get_manager
 from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import TtnsSymbolicEvolveCalcJob
 
 
-def _resolve_code() -> orm.Code:
-    qb = orm.QueryBuilder().append(
-        orm.Code,
-        filters={"attributes.input_plugin": "reno.script"},
-    )
-    result = qb.first()
-    if result is not None:
-        return result[0]
+def _resolve_code() -> orm.AbstractCode:
+    candidate_codes = orm.QueryBuilder().append(orm.InstalledCode, project="*").all(flat=True)
+    for code in candidate_codes:
+        if code.default_calc_job_plugin != "reno.script":
+            continue
+        if code.computer.label != "localhost":
+            continue
+        if not Path(str(code.filepath_executable)).exists():
+            continue
+        return code
 
     computer = orm.load_computer("localhost")
+    executable = sys.executable
+    base_label = "reno-script-auto"
+    label = base_label
+    suffix = 1
+    while orm.QueryBuilder().append(orm.InstalledCode, filters={"label": label}).count() > 0:
+        label = f"{base_label}-{suffix}"
+        suffix += 1
     return orm.InstalledCode(
-        label="reno-script-auto",
+        label=label,
         computer=computer,
-        filepath_executable=sys.executable,
+        filepath_executable=executable,
         default_calc_job_plugin="reno.script",
         description="Auto-created by examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py",
     ).store()

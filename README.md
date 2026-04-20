@@ -58,10 +58,10 @@ pip install -e ".[dev]"
 
 For production usage, use PostgreSQL plus RabbitMQ.
 
-### Conda example
+### Conda example (Linux)
 
 ```bash
-conda create -n aiida -c conda-forge python=3.12 postgresql rabbitmq aiida-core=2.8.0
+conda create -n aiida -c conda-forge python=3.12 aiida-core=2.7.3 aiida-core.services postgresql "numpy<2.0"
 conda activate aiida
 
 # Initialize and start PostgreSQL inside the conda environment
@@ -69,9 +69,36 @@ mkdir -p "$CONDA_PREFIX/var/postgresql"
 initdb -D "$CONDA_PREFIX/var/postgresql"
 pg_ctl -D "$CONDA_PREFIX/var/postgresql" -l "$CONDA_PREFIX/var/postgresql/logfile" start
 
-# Start RabbitMQ inside the conda environment
-rabbitmq-server -detached
+# Start services
+verdi presto
 ```
+
+Notes:
+
+- On Linux, `aiida-core.services` can manage PostgreSQL and RabbitMQ.
+
+### Conda example (macOS)
+
+```bash
+conda create -n aiida -c conda-forge python=3.12 aiida-core=2.7.3 postgresql rabbitmq-server "numpy<2.0"
+conda activate aiida
+
+# Initialize and start PostgreSQL inside the conda environment
+mkdir -p "$CONDA_PREFIX/var/postgresql"
+initdb -D "$CONDA_PREFIX/var/postgresql"
+pg_ctl -D "$CONDA_PREFIX/var/postgresql" -l "$CONDA_PREFIX/var/postgresql/logfile" start
+
+# Start RabbitMQ broker
+rabbitmq-server -detached
+rabbitmqctl await_startup
+```
+
+Notes:
+
+- On macOS, do not rely on `aiida-core.services` due to dependency/platform issues.
+- `rabbitmq-server` is the RabbitMQ broker daemon required by AiiDA daemon/task transport.
+- If `rabbitmq-server -detached` fails with an address/port error, check:
+  `rabbitmq-diagnostics -q ping`
 
 ### Create database and profile
 
@@ -215,6 +242,7 @@ factor = 0.08
 ```
 
 Ready-to-copy files are included at:
+
 - `examples/cli_inputs/basis.toml`
 - `examples/cli_inputs/model.toml`
 
@@ -299,19 +327,17 @@ uv run python -m pytest -q tests
 
 ## Requirements
 
-- Python >= 3.10
-- `aiida-core==2.8.0`
-- `renormalizer>=0.0.11`
+- Python >= 3.9
+- `aiida-core==2.7.3`
+- `renormalizer`
 - `numpy<2.0`
 
 ## Compatibility Notes
 
 - The plugin drivers target current Renormalizer public APIs (`renormalizer.utils.configs`), not legacy `renormalizer.parameter`.
-- For AiiDA 2.8.0 environments, use `verdi run ...` for script-style launches.
+- For AiiDA 2.7.3 environments, use `verdi run ...` for script-style launches.
 - Some advanced Renormalizer branches are upstream-limited and may raise `NotImplementedError` depending on model/configuration (for example complex Kubo coupling paths).
 
 ## License
-
-
 
 Not Setup now

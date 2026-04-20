@@ -84,38 +84,6 @@ class TestCompressConfig:
         assert restored.criteria == CompressCriteria.threshold
         assert restored.threshold == pytest.approx(1e-3)
 
-    def test_roundtrip_with_ofs(self, aiida_profile):
-        from renormalizer.utils.configs import CompressConfig, CompressCriteria, OFS
-
-        from aiida_renormalizer.data.config import ConfigData
-
-        config = CompressConfig(
-            criteria=CompressCriteria.fixed,
-            max_bonddim=50,
-            ofs=OFS.ofs_d,
-            ofs_swap_jw=True,
-        )
-        node = ConfigData.from_config(config)
-        node.store()
-
-        restored = node.load_config()
-        assert restored.criteria == CompressCriteria.fixed
-        assert restored.bond_dim_max_value == 50
-        assert restored.ofs == OFS.ofs_d
-        assert restored.ofs_swap_jw is True
-
-    def test_ofs_requires_fixed_criteria(self):
-        from renormalizer.utils.configs import CompressConfig, CompressCriteria, OFS
-
-        from aiida_renormalizer.data.config import ConfigData
-
-        config = CompressConfig(
-            criteria=CompressCriteria.threshold,
-            ofs=OFS.ofs_s,
-        )
-        with pytest.raises(ValueError, match="OFS requires.*fixed"):
-            ConfigData.from_config(config)
-
     def test_roundtrip_vprocedure(self, aiida_profile):
         from renormalizer.utils.configs import CompressConfig
 

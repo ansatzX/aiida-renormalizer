@@ -38,15 +38,3 @@ def test_bath_templates_exist():
         assert os.path.exists(template_path), f"Template not found: {template_path}"
 
 
-def test_import_all_bath_calculations():
-    """Test that all bath CalcJob classes can be imported."""
-    from aiida_renormalizer.calculations.bath import (
-        BathSpectralDensityCalcJob,
-        BathDiscretizationCalcJob,
-        BathToMpoCoeffCalcJob,
-    )
-
-    assert BathSpectralDensityCalcJob is not None
-    assert BathDiscretizationCalcJob is not None
-    assert BathToMpoCoeffCalcJob is not None
-

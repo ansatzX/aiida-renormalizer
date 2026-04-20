@@ -2,24 +2,33 @@
 """Prepare symbolic input Dict node for TtnsSymbolicEvolveCalcJob."""
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 
 from aiida import orm
 
 
-def _resolve_code() -> orm.Code:
-    qb = orm.QueryBuilder().append(
-        orm.Code,
-        filters={"attributes.input_plugin": "reno.script"},
-    )
-    result = qb.first()
-    if result is not None:
-        return result[0]
+def _resolve_code() -> orm.AbstractCode:
+    candidate_codes = orm.QueryBuilder().append(orm.InstalledCode, project="*").all(flat=True)
+    for code in candidate_codes:
+        if code.default_calc_job_plugin != "reno.script":
+            continue
+        if code.computer.label != "localhost":
+            continue
+        if not Path(str(code.filepath_executable)).exists():
+            continue
+        return code
 
     # Auto-create a local Python code for reno.script if missing.
     computer = orm.load_computer("localhost")
+    base_label = "reno-script-auto"
+    label = base_label
+    suffix = 1
+    while orm.QueryBuilder().append(orm.InstalledCode, filters={"label": label}).count() > 0:
+        label = f"{base_label}-{suffix}"
+        suffix += 1
     code = orm.InstalledCode(
-        label="reno-script-auto",
+        label=label,
         computer=computer,
         filepath_executable=sys.executable,
         default_calc_job_plugin="reno.script",

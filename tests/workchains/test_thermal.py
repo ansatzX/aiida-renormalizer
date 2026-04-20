@@ -1,169 +1,73 @@
-"""Tests for ThermalStateWorkChain."""
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+"""Behavioral tests for ThermalStateWorkChain."""
+from __future__ import annotations
+
+from unittest.mock import Mock
 
 from aiida import orm
-from aiida.engine import WorkChain
 
 from aiida_renormalizer.workchains.thermal import ThermalStateWorkChain
-from tests.workchains.conftest import make_workchain, Namespace
+from tests.workchains.conftest import Namespace, make_workchain
 
 
-class TestThermalStateWorkChain:
-    """Test cases for ThermalStateWorkChain."""
+def test_setup_rejects_missing_temperature_and_beta():
+    wc = make_workchain(ThermalStateWorkChain)
+    wc.inputs = Namespace()
+    wc.ctx = Namespace()
 
-    def test_workchain_class_exists(self):
-        """Test that ThermalStateWorkChain can be imported."""
-        from aiida_renormalizer.workchains import ThermalStateWorkChain as TSC
-        assert TSC is ThermalStateWorkChain
+    result = wc.setup()
 
-    def test_workchain_inherits_from_workchain(self):
-        """Test that ThermalStateWorkChain inherits from WorkChain."""
-        assert issubclass(ThermalStateWorkChain, WorkChain)
-
-    def test_workchain_has_define_method(self):
-        """Test that ThermalStateWorkChain has define method."""
-        assert hasattr(ThermalStateWorkChain, 'define')
-
-    def test_workchain_has_outline(self):
-        """Test that ThermalStateWorkChain has outline."""
-        # Check that the spec has an outline
-        spec = ThermalStateWorkChain.spec()
-        # Outline should be defined
-        assert spec.get_outline() is not None
-
-    def test_workchain_has_exit_codes(self):
-        """Test that ThermalStateWorkChain has exit codes defined."""
-        assert hasattr(ThermalStateWorkChain, 'exit_codes')
-        exit_codes = ThermalStateWorkChain.exit_codes
-
-        # Check for specific exit codes
-        assert hasattr(exit_codes, 'ERROR_INVALID_TEMPERATURE')
-        assert hasattr(exit_codes, 'ERROR_THERMAL_PROP_FAILED')
-        assert hasattr(exit_codes, 'ERROR_INVALID_THERMAL_STATE')
-
-    def test_exit_codes_have_correct_status(self):
-        """Test that exit codes have correct status values."""
-        exit_codes = ThermalStateWorkChain.exit_codes
-
-        assert exit_codes.ERROR_INVALID_TEMPERATURE.status == 350
-        assert exit_codes.ERROR_THERMAL_PROP_FAILED.status == 351
-        assert exit_codes.ERROR_INVALID_THERMAL_STATE.status == 352
-
-    def test_workchain_has_required_methods(self):
-        """Test that ThermalStateWorkChain has required methods."""
-        required_methods = [
-            'setup',
-            'construct_initial_state',
-            'run_thermal_prop',
-            'inspect_thermal_state',
-            'return_thermal_state',
-        ]
-
-        for method in required_methods:
-            assert hasattr(ThermalStateWorkChain, method), f"Missing method: {method}"
-
-    def test_setup_validates_temperature_inputs(self):
-        """Test that setup validates temperature/beta inputs correctly."""
-        # This would require mocking the WorkChain context
-        # For now, we just verify the method exists and can be called
-        assert callable(ThermalStateWorkChain.setup)
-
-    def test_workchain_inputs_defined(self):
-        """Test that WorkChain has expected inputs defined."""
-        spec = ThermalStateWorkChain.spec()
-
-        # Check inputs exist
-        inputs = spec.inputs
-        assert 'model' in inputs
-        assert 'temperature' in inputs
-        assert 'beta' in inputs
-        assert 'code' in inputs
-
-    def test_workchain_outputs_defined(self):
-        """Test that WorkChain has expected outputs defined."""
-        spec = ThermalStateWorkChain.spec()
-
-        # Check outputs exist
-        outputs = spec.outputs
-        assert 'thermal_mpdm' in outputs
-        assert 'partition_function' in outputs
-        assert 'free_energy' in outputs
-        assert 'output_parameters' in outputs
+    assert result == wc.exit_codes.ERROR_INVALID_TEMPERATURE
 
 
-class TestThermalStateWorkChainIntegration:
-    """Integration tests for ThermalStateWorkChain (requires AiiDA profile)."""
+def test_setup_rejects_temperature_and_beta_together():
+    wc = make_workchain(ThermalStateWorkChain)
+    wc.inputs = Namespace(temperature=orm.Float(1.0), beta=orm.Float(1.0))
+    wc.ctx = Namespace()
 
-    @pytest.mark.skip(reason="Requires AiiDA profile and setup")
-    def test_workchain_can_be_instantiated(self):
-        """Test that ThermalStateWorkChain can be instantiated."""
-        # This would require a proper AiiDA profile
-        pass
+    result = wc.setup()
 
-    @pytest.mark.skip(reason="Requires AiiDA profile and setup")
-    def test_workchain_can_be_submitted(self):
-        """Test that ThermalStateWorkChain can be submitted."""
-        # This would require a proper AiiDA profile and inputs
-        pass
+    assert result == wc.exit_codes.ERROR_INVALID_TEMPERATURE
 
 
-class TestThermalStateWorkChainMethods:
-    """Test individual methods of ThermalStateWorkChain."""
+def test_setup_computes_beta_from_temperature():
+    wc = make_workchain(ThermalStateWorkChain)
+    wc.inputs = Namespace(temperature=orm.Float(2.0))
+    wc.ctx = Namespace()
 
-    def test_construct_initial_state_method_signature(self):
-        """Test that construct_initial_state has correct signature."""
-        import inspect
-        sig = inspect.signature(ThermalStateWorkChain.construct_initial_state)
-        # Should accept self
-        params = list(sig.parameters.keys())
-        assert 'self' in params
+    result = wc.setup()
 
-    def test_run_thermal_prop_method_signature(self):
-        """Test that run_thermal_prop has correct signature."""
-        import inspect
-        sig = inspect.signature(ThermalStateWorkChain.run_thermal_prop)
-        params = list(sig.parameters.keys())
-        assert 'self' in params
-
-    def test_inspect_thermal_state_method_signature(self):
-        """Test that inspect_thermal_state has correct signature."""
-        import inspect
-        sig = inspect.signature(ThermalStateWorkChain.inspect_thermal_state)
-        params = list(sig.parameters.keys())
-        assert 'self' in params
-
-    def test_return_thermal_state_method_signature(self):
-        """Test that return_thermal_state has correct signature."""
-        import inspect
-        sig = inspect.signature(ThermalStateWorkChain.return_thermal_state)
-        params = list(sig.parameters.keys())
-        assert 'self' in params
+    assert result is None
+    assert wc.ctx.temperature == 2.0
+    assert wc.ctx.beta == 0.5
 
 
-class TestThermalStateWorkChainMocked:
-    """Test ThermalStateWorkChain with mocked dependencies."""
+def test_inspect_thermal_state_rejects_non_positive_partition_function():
+    wc = make_workchain(ThermalStateWorkChain)
+    params = Mock()
+    params.get_dict.return_value = {"partition_function": 0.0}
+    calc = Mock()
+    calc.is_finished_ok = True
+    calc.outputs = Namespace(output_mps=Mock(), output_parameters=params)
+    wc.ctx = Namespace(thermal_calc=calc, temperature=1.0)
 
-    @patch('aiida_renormalizer.workchains.thermal.ThermalPropCalcJob')
-    def test_run_thermal_prop_calls_submit(self, mock_calcjob):
-        """Test that run_thermal_prop submits ThermalPropCalcJob."""
-        wc = make_workchain(ThermalStateWorkChain)
+    result = wc.inspect_thermal_state()
 
-        # Mock context
-        wc.ctx = Namespace()
-        wc.ctx.initial_mpdm = Mock()
-        wc.ctx.temperature = 1.0
-        wc.ctx.beta = 1.0
+    assert result == wc.exit_codes.ERROR_INVALID_THERMAL_STATE
 
-        # Mock inputs -- use Namespace so ``"mpo" in self.inputs`` works
-        wc.inputs = Namespace(
-            model=Mock(),
-            n_iterations=Mock(value=10),
-            code=Mock(),
-        )
 
-        # Call the actual method
-        ThermalStateWorkChain.run_thermal_prop(wc)
+def test_inspect_thermal_state_extracts_thermodynamics():
+    wc = make_workchain(ThermalStateWorkChain)
+    params = Mock()
+    params.get_dict.return_value = {"partition_function": 2.0, "extra": 1}
+    output_mps = Mock()
+    calc = Mock()
+    calc.is_finished_ok = True
+    calc.outputs = Namespace(output_mps=output_mps, output_parameters=params)
+    wc.ctx = Namespace(thermal_calc=calc, temperature=1.0)
 
-        # Verify submit was called
-        assert wc.submit.called
+    result = wc.inspect_thermal_state()
+
+    assert result is None
+    assert wc.ctx.thermal_mpdm is output_mps
+    assert wc.ctx.partition_function == 2.0
+    assert wc.ctx.thermal_params["extra"] == 1

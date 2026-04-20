@@ -6,6 +6,8 @@ from aiida.cmdline.utils import echo
 from aiida import orm
 from aiida.engine import submit, run
 
+from aiida_renormalizer.cli.code_resolver import find_default_script_code
+
 
 @click.command('convergence')
 @click.option(
@@ -125,15 +127,13 @@ def convergence(model, basis, sweep_type, range, energy_convergence, code,
         except Exception as e:
             echo.echo_critical(f"Failed to load code '{code}': {e}")
     else:
-        codes = orm.QueryBuilder().append(orm.Code, filters={
-            'attributes.input_plugin': 'reno.script'
-        }).all()
-        if codes:
-            code_obj = codes[0][0]
+        code_obj = find_default_script_code()
+        if code_obj is not None:
             echo.echo_info(f"Using code: {code_obj.label}")
         else:
             echo.echo_critical(
-                "No code found. Please specify with -C option or setup a code."
+                "No healthy code found for plugin 'reno.script'. "
+                "Please specify -C or configure a valid code."
             )
 
     # Create ModelData and BasisSetData

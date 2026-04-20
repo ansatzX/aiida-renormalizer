@@ -58,8 +58,7 @@ save_output_parameters({
 """
 
     # 5. Create code
-    from aiida.orm import Code
-    code = Code.get(label='renormalizer@localhost')
+    code = orm.load_code('renormalizer@localhost')
 
     # 6. Build and submit
     builder = RenoScriptCalcJob.get_builder()
@@ -134,8 +133,7 @@ save_mps(mps, 'output_mps.npz', f'Evolved state after {n_steps} steps')
 """
 
     # 5. Build and submit
-    from aiida.orm import Code
-    code = Code.get(label='renormalizer@localhost')
+    code = orm.load_code('renormalizer@localhost')
 
     builder = RenoScriptCalcJob.get_builder()
     builder.code = code
@@ -204,8 +202,7 @@ save_output_parameters(observables)
 """
 
     # 4. Build and submit
-    from aiida.orm import Code
-    code = Code.get(label='renormalizer@localhost')
+    code = orm.load_code('renormalizer@localhost')
 
     builder = RenoScriptCalcJob.get_builder()
     builder.code = code
@@ -228,8 +225,6 @@ save_output_parameters(observables)
 def example_4_custom_analysis():
     """Example 4: Custom analysis without Reno data."""
     _ensure_profile()
-    from aiida.orm import Code
-
     # Define a script that doesn't need Reno objects
     script = """
 import numpy as np
@@ -258,7 +253,7 @@ save_data({
 """
 
     # Build and submit (no model/mps/mpo needed)
-    code = Code.get(label='python@localhost')
+    code = orm.load_code('python@localhost')
 
     builder = RenoScriptCalcJob.get_builder()
     builder.code = code

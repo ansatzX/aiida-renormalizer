@@ -7,6 +7,8 @@ from aiida import orm
 from aiida.engine import submit, run
 from aiida.orm import load_node
 
+from aiida_renormalizer.cli.code_resolver import find_default_script_code
+
 
 @click.command('spectrum')
 @click.option(
@@ -147,15 +149,13 @@ def spectrum(state, hamiltonian, operator, method, frequency_range, eta,
         )
 
     # Find code
-    codes = orm.QueryBuilder().append(orm.Code, filters={
-        'attributes.input_plugin': 'reno.script'
-    }).all()
-    if codes:
-        code = codes[0][0]
+    code = find_default_script_code()
+    if code is not None:
         echo.echo_info(f"Using code: {code.label}")
     else:
         echo.echo_critical(
-            "No code found. Please setup a code with 'reno.script' plugin."
+            "No healthy code found for plugin 'reno.script'. "
+            "Please configure a valid code."
         )
 
     # Run spectrum calculation
