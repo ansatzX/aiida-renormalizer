@@ -200,6 +200,17 @@ save_output_parameters({
     # No data inputs required
 
 
+def test_scripted_calcjob_default_parser():
+    """Scripted CalcJob should default to the scripted parser."""
+    from aiida_renormalizer.calculations.scripted import RenoScriptCalcJob
+    from aiida.engine import CalcJobProcessSpec
+
+    spec = CalcJobProcessSpec()
+    RenoScriptCalcJob.define(spec)
+
+    assert spec.inputs["metadata"]["options"]["parser_name"].default == "reno.scripted"
+
+
 def test_scripted_template_rendering(simple_model, simple_mps, fixture_code):
     """Test that the Jinja2 template renders correctly."""
     from aiida_renormalizer.calculations.scripted import RenoScriptCalcJob

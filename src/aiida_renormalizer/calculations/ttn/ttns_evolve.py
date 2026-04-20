@@ -52,8 +52,11 @@ class TtnsEvolveCalcJob(RenoBaseCalcJob):
         spec.input(
             "config",
             valid_type=ConfigData,
-            help="EvolveConfig with evolution parameters (method, nsteps, dt, etc.)",
+            required=False,
+            help="EvolveConfig with method and integration settings",
         )
+        spec.input("dt", valid_type=orm.Float, help="Time step for each evolution step")
+        spec.input("nsteps", valid_type=orm.Int, help="Number of evolution steps")
 
         # Outputs
         spec.output(
@@ -111,6 +114,16 @@ class TtnsEvolveCalcJob(RenoBaseCalcJob):
             with open(actual, "rb") as src:
                 with folder.open("input_ttno.npz", "wb") as dst:
                     dst.write(src.read())
+
+        with folder.open("input_evolution_params.json", "w") as f:
+            json.dump(
+                {
+                    "dt": self.inputs.dt.value,
+                    "nsteps": self.inputs.nsteps.value,
+                },
+                f,
+                indent=2,
+            )
 
     def _get_retrieve_list(self) -> list[str]:
         """Get list of files to retrieve after calculation."""

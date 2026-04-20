@@ -1,0 +1,93 @@
+"""Driver script for BathSpectralDensityCalcJob."""
+import json
+import numpy as np
+
+
+def _ohmic_exp(omega, alpha, omega_c, s_exp):
+    return (np.pi / 2.0) * alpha * (omega ** s_exp) * (omega_c ** (1.0 - s_exp)) * np.exp(-omega / omega_c)
+
+
+def _debye(omega, lamb, omega_c):
+    return 2.0 * lamb * omega * omega_c / (omega ** 2 + omega_c ** 2)
+
+
+def _cole_davidson(omega, ita, omega_c, beta):
+    theta = np.arctan(omega / omega_c)
+    return ita * np.sin(beta * theta) / ((1.0 + (omega / omega_c) ** 2) ** (beta / 2.0))
+
+
+def save_output_parameters(params, output_file="output_parameters.json"):
+    with open(output_file, "w") as f:
+        json.dump(params, f, indent=2)
+
+
+if __name__ == "__main__":
+    with open("input_bath_spectral_density.json", "r") as f:
+        p = json.load(f)
+
+    sdf_type = p["spectral_density_type"]
+    omega_min = float(p["omega_min"])
+    omega_max = float(p["omega_max"])
+    num_points = int(p["num_points"])
+    alpha = float(p["alpha"])
+    s_exp = float(p["s_exponent"])
+    cutoff = float(p["cutoff"])
+    lamb = float(p["lambda_reorg"])
+    beta = float(p["beta"])
+
+    try:
+        {% if has_custom_spectrum %}
+        omega_grid = np.load("custom_omega_grid.npy")
+        j_omega = np.load("custom_j_omega.npy")
+        mode = "custom"
+        {% else %}
+        if num_points < 2:
+            raise ValueError("num_points must be >= 2")
+        if omega_max <= omega_min:
+            raise ValueError("omega_max must be > omega_min")
+        if cutoff <= 0:
+            raise ValueError("cutoff must be positive")
+
+        omega_grid = np.linspace(omega_min, omega_max, num_points)
+        if sdf_type == "ohmic_exp":
+            j_omega = _ohmic_exp(omega_grid, alpha=alpha, omega_c=cutoff, s_exp=s_exp)
+        elif sdf_type == "debye":
+            j_omega = _debye(omega_grid, lamb=lamb, omega_c=cutoff)
+        elif sdf_type == "cole_davidson":
+            j_omega = _cole_davidson(omega_grid, ita=lamb, omega_c=cutoff, beta=beta)
+        else:
+            raise ValueError(f"Unknown spectral_density_type: {sdf_type}")
+        mode = "analytic"
+        {% endif %}
+
+        if omega_grid.shape != j_omega.shape:
+            raise ValueError("omega_grid and j_omega must have identical shape")
+        if np.any(omega_grid < 0):
+            raise ValueError("omega_grid contains negative values")
+        if np.any(j_omega < 0):
+            raise ValueError("j_omega contains negative values")
+
+        output = {
+            "calcjob_class": "BathSpectralDensityCalcJob",
+            "calc_type": "bath_spectral_density",
+            "mode": mode,
+            "spectral_density_type": sdf_type,
+            "omega_grid": omega_grid.tolist(),
+            "j_omega": j_omega.tolist(),
+            "integral_j_omega": float(np.trapz(j_omega, omega_grid)),
+            "converged": True,
+        }
+        save_output_parameters(output)
+    except Exception as exc:
+        import traceback
+        save_output_parameters(
+            {
+                "calcjob_class": "BathSpectralDensityCalcJob",
+                "calc_type": "bath_spectral_density",
+                "converged": False,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+        raise
+

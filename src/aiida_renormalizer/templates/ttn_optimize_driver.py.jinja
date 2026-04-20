@@ -34,13 +34,13 @@ def load_config(input_file='input_config.json'):
         with open(input_file, 'r') as f:
             data = json.load(f)
         # Reconstruct OptimizeConfig from data
-        from renormalizer.parameter import OptimizeConfig
+        from renormalizer.utils.configs import OptimizeConfig
         config_class = data.get('config_class', 'OptimizeConfig')
         fields = data.get('fields', {})
         return OptimizeConfig(**fields)
     except FileNotFoundError:
         # Return default config
-        from renormalizer.parameter import OptimizeConfig
+        from renormalizer.utils.configs import OptimizeConfig
         return OptimizeConfig()
 
 # ============================================================================

@@ -18,12 +18,11 @@ class CustomPipelineWorkChain(WorkChain):
 
     Each step is a dictionary:
         {
-            'step': 'step_type',  # e.g., 'apply_operator', 'compress', 'tdvp'
+            'step': 'step_type',  # e.g., 'compress', 'tdvp', 'dmrg'
             'inputs': {...},       # Step-specific inputs (optional)
         }
 
     Supported step types:
-        - 'apply_operator': ApplyOperatorCalcJob
         - 'compress': CompressCalcJob
         - 'expectation': ExpectationCalcJob
         - 'tdvp': TDVPCalcJob
@@ -49,7 +48,6 @@ class CustomPipelineWorkChain(WorkChain):
 
     # Dispatch table mapping step types to their CalcJob classes
     STEP_DISPATCH_TABLE = {
-        'apply_operator': ('aiida_renormalizer.calculations.basic', 'ApplyOperatorCalcJob'),
         'compress': ('aiida_renormalizer.calculations.basic', 'CompressCalcJob'),
         'expectation': ('aiida_renormalizer.calculations.basic', 'ExpectationCalcJob'),
         'build_mpo': ('aiida_renormalizer.calculations.basic', 'BuildMpoCalcJob'),
@@ -62,6 +60,7 @@ class CustomPipelineWorkChain(WorkChain):
         'spectra_finite_t': ('aiida_renormalizer.calculations.spectra', 'SpectraFiniteTCalcJob'),
         'kubo': ('aiida_renormalizer.calculations.spectra', 'KuboCalcJob'),
         'script': ('aiida_renormalizer.calculations.scripted', 'RenoScriptCalcJob'),
+        'bath_spin_boson_model': ('aiida_renormalizer.workchains', 'BathSpinBosonModelWorkChain'),
     }
 
     @classmethod
@@ -198,7 +197,7 @@ class CustomPipelineWorkChain(WorkChain):
         # Add current state as initial MPS (if applicable)
         if self.ctx.current_state is not None:
             # Different CalcJobs use different input names for initial state
-            if step_type in ['apply_operator', 'compress', 'tdvp', 'dmrg', 'imag_time', 'thermal_prop']:
+            if step_type in ['compress', 'tdvp', 'dmrg', 'imag_time', 'thermal_prop']:
                 inputs["initial_mps"] = self.ctx.current_state
             elif step_type == 'expectation':
                 inputs["mps"] = self.ctx.current_state

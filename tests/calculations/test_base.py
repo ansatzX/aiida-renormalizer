@@ -79,3 +79,16 @@ class TestRenoBaseCalcJob:
 
         # Check that common outputs are defined
         assert 'output_parameters' in spec.outputs
+
+    def test_default_parser_name(self):
+        """Base CalcJob should default to the Reno base parser."""
+        from aiida_renormalizer.calculations.base import RenoBaseCalcJob
+        from aiida.engine import CalcJobProcessSpec
+
+        class ConcreteCalcJob(RenoBaseCalcJob):
+            _template_name = "test_driver.py.jinja"
+
+        spec = CalcJobProcessSpec()
+        ConcreteCalcJob.define(spec)
+
+        assert spec.inputs["metadata"]["options"]["parser_name"].default == "reno.base"

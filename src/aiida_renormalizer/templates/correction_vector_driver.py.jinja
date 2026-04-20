@@ -6,7 +6,8 @@ import json
 import numpy as np
 from renormalizer.model import Model
 from renormalizer.mps import Mps, Mpo
-from renormalizer.cv import SpectraZtCV, SpectraFtCV, batch_run
+from renormalizer.cv.spectra_cv import batch_run
+from renormalizer.cv.zerot import SpectraZtCV
 
 # ============================================================================
 # INPUT LOADING UTILITIES (from base template)

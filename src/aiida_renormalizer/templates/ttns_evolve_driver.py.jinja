@@ -6,7 +6,7 @@ import json
 import numpy as np
 from renormalizer.tn.treebase import BasisTree
 from renormalizer.tn.tree import TTNS, TTNO
-from renormalizer.parameter import EvolveConfig
+from renormalizer.utils.configs import EvolveConfig
 
 # ============================================================================
 # INPUT LOADING UTILITIES (from base template)
@@ -39,8 +39,14 @@ def load_config(input_file='input_config.json'):
         return EvolveConfig(**fields)
     except FileNotFoundError:
         # Return default config
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         return EvolveConfig()
+
+def load_evolution_params(input_file='input_evolution_params.json'):
+    """Load explicit evolution parameters."""
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+    return int(data['nsteps']), float(data['dt'])
 
 # ============================================================================
 # OUTPUT SERIALIZATION UTILITIES (from base template)
@@ -71,14 +77,13 @@ if __name__ == '__main__':
     ttns = load_ttns('initial_ttns.npz', basis_tree)
     ttno = load_ttno('input_ttno.npz', basis_tree)
     config = load_config()
+    nsteps, dt = load_evolution_params()
 
     # Apply config to TTNS
     ttns.evolve_config = config
 
     # Get evolution parameters
-    nsteps = config.nsteps
-    dt = config.dt
-    evolve_method = config.evolve_method
+    evolve_method = config.method
 
     # Track energy during evolution
     energies = []
@@ -92,7 +97,7 @@ if __name__ == '__main__':
     # Time evolution loop
     for istep in range(nsteps):
         # Evolve one step
-        ttns.evolve(ttno, dt, normalize=True)
+        ttns = ttns.evolve(ttno, dt, normalize=True)
 
         # Compute energy
         E = ttns.expectation(ttno)
@@ -118,3 +123,10 @@ if __name__ == '__main__':
     # Save evolved TTNS with description
     description = f'TTN evolved state, final E={energies[-1]:.10f}'
     save_ttns(ttns, 'output_ttns.npz', description)
+
+    # Save trajectory arrays for downstream tooling
+    np.savez(
+        'trajectory.npz',
+        times=np.array(times, dtype=float),
+        energies=np.array(energies, dtype=float),
+    )

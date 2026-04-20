@@ -229,6 +229,8 @@ def evolve(state, hamiltonian, total_time, timestep, method, checkpoint_time,
 
     elif tn_type == 'ttn':
         from aiida_renormalizer.workchains.ttn_time_evolution import TtnTimeEvolutionWorkChain
+        from aiida_renormalizer.data.config import ConfigData
+        from renormalizer.utils.configs import EvolveConfig, EvolveMethod
 
         # Need basis tree for TTN evolution
         try:
@@ -240,12 +242,21 @@ def evolve(state, hamiltonian, total_time, timestep, method, checkpoint_time,
             )
 
         echo.echo_info("Running TTN time evolution...")
+        method_map = {
+            "tdvp": EvolveMethod.tdvp_ps,
+            "tddmrp": EvolveMethod.tdvp_ps2,
+            "rk4": EvolveMethod.prop_and_compress_tdrk4,
+        }
+        evolve_config = EvolveConfig(method=method_map[method])
+        config_data = ConfigData.from_config(evolve_config)
+
         inputs = {
             'basis_tree': basis_tree,
             'ttno': hamiltonian_obj,
             'initial_ttns': initial_state,
             'total_time': orm.Float(total_time),
-            'config': orm.Dict(config),
+            'dt': orm.Float(timestep),
+            'config': config_data,
             'max_energy_drift': orm.Float(max_energy_drift),
             'code': code,
         }

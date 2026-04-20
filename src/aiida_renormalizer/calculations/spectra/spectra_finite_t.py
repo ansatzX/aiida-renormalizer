@@ -168,5 +168,6 @@ class SpectraFiniteTCalcJob(RenoBaseCalcJob):
                 json.dump(self.inputs.ievolve_config.get_dict(), f, indent=2)
 
         if "icompress_config" in self.inputs:
+            payload = self._sanitize_compress_config_payload(self.inputs.icompress_config.get_dict())
             with folder.open("input_icompress_config.json", "w") as f:
-                json.dump(self.inputs.icompress_config.get_dict(), f, indent=2)
+                json.dump(payload, f, indent=2)

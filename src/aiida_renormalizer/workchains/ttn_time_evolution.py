@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext, while_
 
 from aiida_renormalizer.calculations.ttn.ttns_evolve import TtnsEvolveCalcJob
-from aiida_renormalizer.data import BasisTreeData, TTNSData, TtnoData
+from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TtnoData
 
 
 class TtnTimeEvolutionWorkChain(WorkChain):
@@ -50,7 +50,8 @@ class TtnTimeEvolutionWorkChain(WorkChain):
             default=lambda: orm.Float(10.0),
             help="Time interval between checkpoints",
         )
-        spec.input("config", valid_type=orm.Dict, required=False, help="Evolution config")
+        spec.input("config", valid_type=ConfigData, required=False, help="Evolution config")
+        spec.input("dt", valid_type=orm.Float, help="Time step")
         spec.input(
             "max_energy_drift",
             valid_type=orm.Float,
@@ -87,6 +88,11 @@ class TtnTimeEvolutionWorkChain(WorkChain):
             "ERROR_EVOLUTION_FAILED",
             message="TTN time evolution calculation failed",
         )
+        spec.exit_code(
+            342,
+            "ERROR_TIME_GRID_MISMATCH",
+            message="total_time/checkpoint_time is not compatible with dt",
+        )
 
         # Outline
         spec.outline(
@@ -107,31 +113,57 @@ class TtnTimeEvolutionWorkChain(WorkChain):
         self.ctx.trajectory_segments = []
         self.ctx.iteration = 0
 
-        # Determine number of checkpoint segments
         total_time = self.inputs.total_time.value
         checkpoint_time = self.inputs.checkpoint_time.value
-        self.ctx.n_checkpoints = int(total_time / checkpoint_time)
-        if total_time % checkpoint_time > 0:
-            self.ctx.n_checkpoints += 1
+        dt = self.inputs.dt.value
+
+        if dt <= 0:
+            return self.exit_codes.ERROR_TIME_GRID_MISMATCH
+
+        total_steps_float = total_time / dt
+        total_steps = int(round(total_steps_float))
+        if abs(total_steps_float - total_steps) > 1e-10:
+            self.report(
+                f"Time grid mismatch: total_time={total_time} is not an integer multiple of dt={dt}"
+            )
+            return self.exit_codes.ERROR_TIME_GRID_MISMATCH
+
+        steps_per_checkpoint_float = checkpoint_time / dt
+        steps_per_checkpoint = int(round(steps_per_checkpoint_float))
+        if abs(steps_per_checkpoint_float - steps_per_checkpoint) > 1e-10:
+            self.report(
+                f"Time grid mismatch: checkpoint_time={checkpoint_time} is not an integer multiple of dt={dt}"
+            )
+            return self.exit_codes.ERROR_TIME_GRID_MISMATCH
+        if steps_per_checkpoint <= 0:
+            return self.exit_codes.ERROR_TIME_GRID_MISMATCH
+
+        self.ctx.total_steps = total_steps
+        self.ctx.current_step = 0
+        self.ctx.steps_per_checkpoint = steps_per_checkpoint
+        self.ctx.n_checkpoints = (total_steps + steps_per_checkpoint - 1) // steps_per_checkpoint
 
         self.report(
             f"Starting TTN time evolution: total_time={total_time}, "
-            f"checkpoint_time={checkpoint_time}, n_checkpoints={self.ctx.n_checkpoints}"
+            f"checkpoint_time={checkpoint_time}, dt={dt}, "
+            f"n_steps={total_steps}, n_checkpoints={self.ctx.n_checkpoints}"
         )
 
     def not_finished(self):
         """Check if evolution is complete."""
-        return self.ctx.current_time < self.inputs.total_time.value
+        return self.ctx.current_step < self.ctx.total_steps
 
     def run_checkpoint(self):
         """Run a single checkpoint segment."""
-        # Determine evolution time for this segment
-        remaining_time = self.inputs.total_time.value - self.ctx.current_time
-        segment_time = min(remaining_time, self.inputs.checkpoint_time.value)
+        # Determine evolution steps for this segment
+        remaining_steps = self.ctx.total_steps - self.ctx.current_step
+        segment_steps = min(remaining_steps, self.ctx.steps_per_checkpoint)
+        segment_time = segment_steps * self.inputs.dt.value
 
         self.report(
             f"Running checkpoint {self.ctx.iteration + 1}/{self.ctx.n_checkpoints}: "
-            f"evolving for {segment_time} (current_time={self.ctx.current_time})"
+            f"evolving for {segment_steps} steps ({segment_time} time units, "
+            f"current_time={self.ctx.current_time})"
         )
 
         # Build inputs for TtnsEvolveCalcJob
@@ -139,15 +171,15 @@ class TtnTimeEvolutionWorkChain(WorkChain):
             "basis_tree": self.inputs.basis_tree,
             "ttno": self.inputs.ttno,
             "initial_ttns": self.ctx.current_ttns,
-            "config": self.inputs.config,
+            "dt": self.inputs.dt,
+            "nsteps": orm.Int(segment_steps),
             "code": self.inputs.code,
         }
 
-        # Update config with segment time
-        # Note: In real implementation, would need to modify config to set evolution time
-        # For now, we assume config contains proper time step and method settings
         if "config" in self.inputs:
             inputs["config"] = self.inputs.config
+
+        self.ctx.current_segment_start_time = self.ctx.current_time
 
         # Submit TtnsEvolveCalcJob
         future = self.submit(TtnsEvolveCalcJob, **inputs)
@@ -186,13 +218,15 @@ class TtnTimeEvolutionWorkChain(WorkChain):
 
         # Track trajectory
         if "trajectory" in calc.outputs:
-            self.ctx.trajectory_segments.append(calc.outputs.trajectory)
+            self.ctx.trajectory_segments.append(
+                (self.ctx.current_segment_start_time, calc.outputs.trajectory)
+            )
 
         # Update time and iteration
-        segment_time = min(
-            self.inputs.total_time.value - self.ctx.current_time,
-            self.inputs.checkpoint_time.value
-        )
+        remaining_steps = self.ctx.total_steps - self.ctx.current_step
+        segment_steps = min(remaining_steps, self.ctx.steps_per_checkpoint)
+        segment_time = segment_steps * self.inputs.dt.value
+        self.ctx.current_step += segment_steps
         self.ctx.current_time += segment_time
         self.ctx.iteration += 1
 
@@ -205,12 +239,15 @@ class TtnTimeEvolutionWorkChain(WorkChain):
         # Output final TTNS
         self.out("final_ttns", self.ctx.current_ttns)
 
-        # Output checkpoints
-        self.out("checkpoints", orm.List(list=self.ctx.checkpoints))
+        # Output checkpoints as UUIDs (AiiDA List only supports JSON-serializable payload)
+        checkpoint_uuids = [cp.uuid for cp in self.ctx.checkpoints]
+        self.out("checkpoints", orm.List(list=checkpoint_uuids))
 
         # Output evolution statistics
         stats = {
             "total_time": self.inputs.total_time.value,
+            "dt": self.inputs.dt.value,
+            "n_steps": self.ctx.total_steps,
             "n_checkpoints": self.ctx.iteration,
             "final_time": self.ctx.current_time,
             "energies": self.ctx.energies,
@@ -227,13 +264,34 @@ class TtnTimeEvolutionWorkChain(WorkChain):
             import numpy as np
             from aiida.orm import ArrayData
 
-            # This is simplified - real implementation would properly concatenate
-            # trajectory arrays
             trajectory_ad = ArrayData()
-            # For now, just save the final trajectory segment
-            final_traj = self.ctx.trajectory_segments[-1]
-            for name in final_traj.get_arraynames():
-                trajectory_ad.set_array(name, final_traj.get_array(name))
+
+            merged: dict[str, list[np.ndarray]] = {}
+            for idx, item in enumerate(self.ctx.trajectory_segments):
+                if isinstance(item, tuple) and len(item) == 2:
+                    offset, segment = item
+                else:
+                    offset, segment = 0.0, item
+
+                names = segment.get_arraynames()
+                has_times = "times" in names
+
+                for name in names:
+                    arr = np.asarray(segment.get_array(name))
+                    if name == "times":
+                        arr = arr + float(offset)
+                        if idx > 0 and arr.shape[0] > 0:
+                            arr = arr[1:]
+                    elif has_times and idx > 0 and arr.shape[0] > 0:
+                        arr = arr[1:]
+                    merged.setdefault(name, []).append(arr)
+
+            for name, chunks in merged.items():
+                if len(chunks) == 1:
+                    merged_array = chunks[0]
+                else:
+                    merged_array = np.concatenate(chunks, axis=0)
+                trajectory_ad.set_array(name, merged_array)
 
             self.out("trajectory", trajectory_ad)
 

@@ -53,7 +53,7 @@ def load_config(input_file='input_config.json'):
         config_class = data.get('config_class', 'OptimizeConfig')
         fields = data.get('fields', {})
 
-        from renormalizer.parameter import OptimizeConfig, EvolveConfig, CompressConfig
+        from renormalizer.utils.configs import OptimizeConfig, EvolveConfig, CompressConfig
         config_classes = {
             'OptimizeConfig': OptimizeConfig,
             'EvolveConfig': EvolveConfig,
@@ -62,7 +62,7 @@ def load_config(input_file='input_config.json'):
         config_cls = config_classes.get(config_class, OptimizeConfig)
         return config_cls(**fields)
     except FileNotFoundError:
-        from renormalizer.parameter import OptimizeConfig
+        from renormalizer.utils.configs import OptimizeConfig
         return OptimizeConfig()
 
 def load_op(input_file='input_op.json'):

@@ -28,10 +28,39 @@ class RenoBaseCalcJob(CalcJob):
         super().define(spec)
 
         # Common inputs
-        spec.input('model', valid_type=ModelData, help='Renormalizer Model')
+        spec.input(
+            'model',
+            valid_type=ModelData,
+            required=False,
+            help='Renormalizer Model (required for MPS/MPO-style jobs)',
+        )
         spec.input('config', valid_type=ConfigData, required=False,
                    help='Configuration (EvolveConfig/OptimizeConfig/CompressConfig)')
         spec.input('code', valid_type=orm.Code, help='Code pointing to Python with renormalizer')
+        spec.input(
+            'metadata.options.artifact_storage_backend',
+            valid_type=str,
+            required=False,
+            help='Artifact storage backend for parsed tensor artifacts (e.g. posix).',
+        )
+        spec.input(
+            'metadata.options.artifact_storage_base',
+            valid_type=str,
+            required=False,
+            help='Base path for parsed tensor artifacts.',
+        )
+        spec.input(
+            'metadata.options.artifact_relative_path',
+            valid_type=str,
+            required=False,
+            help='Relative path for parsed tensor artifacts.',
+        )
+        # Real CalcJobProcessSpec has the metadata parser option.
+        # Some unit tests pass a lightweight Mock spec without this structure.
+        try:
+            spec.inputs['metadata']['options']['parser_name'].default = 'reno.base'
+        except (TypeError, KeyError, AttributeError):
+            pass
         # Common outputs
         spec.output('output_parameters', valid_type=orm.Dict,
                     help='Convergence info, energies, observables, etc.')
@@ -134,24 +163,25 @@ class RenoBaseCalcJob(CalcJob):
 
         Subclasses should override to write calc-specific inputs.
         """
-        # Write model.json
         import json
         from aiida_renormalizer.data.utils import read_json_from_repository
 
-        model_data = self.inputs.model
-        model_dict = {
-            'basis': read_json_from_repository(model_data, 'basis.json'),
-            'ham_opsum': read_json_from_repository(model_data, 'ham_opsum.json'),
-        }
+        # Write model.json when present. TTN jobs do not use ModelData.
+        if 'model' in self.inputs:
+            model_data = self.inputs.model
+            model_dict = {
+                'basis': read_json_from_repository(model_data, 'basis.json'),
+                'ham_opsum': read_json_from_repository(model_data, 'ham_opsum.json'),
+            }
 
-        try:
-            dipole_data = read_json_from_repository(model_data, 'dipole.json')
-            model_dict['dipole'] = dipole_data
-        except FileNotFoundError:
-            pass
+            try:
+                dipole_data = read_json_from_repository(model_data, 'dipole.json')
+                model_dict['dipole'] = dipole_data
+            except FileNotFoundError:
+                pass
 
-        with folder.open('input_model.json', 'w') as f:
-            json.dump(model_dict, f, indent=2)
+            with folder.open('input_model.json', 'w') as f:
+                json.dump(model_dict, f, indent=2)
 
         # Write config.json (if provided)
         if 'config' in self.inputs:
@@ -162,3 +192,25 @@ class RenoBaseCalcJob(CalcJob):
                     'config_class': config_data.base.attributes.get('config_class'),
                     'fields': config_dict,
                 }, f, indent=2)
+
+    @staticmethod
+    def _sanitize_compress_config_payload(payload: dict[str, t.Any]) -> dict[str, t.Any]:
+        """Strip unsupported upstream-unimplemented compress settings."""
+        allowed_fields = {
+            "criteria",
+            "threshold",
+            "max_bonddim",
+            "vmethod",
+            "vprocedure",
+            "vrtol",
+            "vguess_m",
+            "dump_matrix_size",
+            "dump_matrix_dir",
+        }
+        cleaned = dict(payload)
+        fields = cleaned.get("fields")
+        if isinstance(fields, dict):
+            cleaned["fields"] = {k: v for k, v in fields.items() if k in allowed_fields}
+        else:
+            cleaned = {k: v for k, v in cleaned.items() if k in allowed_fields}
+        return cleaned

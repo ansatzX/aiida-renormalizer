@@ -39,14 +39,14 @@ def load_config(input_file='input_config.json'):
     try:
         with open(input_file, 'r') as f:
             data = json.load(f)
-        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        from renormalizer.utils.configs import EvolveConfig, EvolveMethod
         config_class = data.get('config_class', 'EvolveConfig')
         fields = data.get('fields', {})
         if 'method' in fields and isinstance(fields['method'], str):
             fields['method'] = EvolveMethod[fields['method']]
         return EvolveConfig(**fields)
     except FileNotFoundError:
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         return EvolveConfig()
 
 # ============================================================================

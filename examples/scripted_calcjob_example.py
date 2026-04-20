@@ -4,15 +4,26 @@
 This script demonstrates how to use the L3 ScriptedCalcJob for custom
 multi-step workflows with AiiDA data provenance.
 """
-from aiida import orm
+from aiida import orm, load_profile
 from aiida.engine import run_get_node
 
 from aiida_renormalizer.data import ModelData, MpsData, MpoData
 from aiida_renormalizer.calculations.scripted import RenoScriptCalcJob
 
 
+_PROFILE_LOADED = False
+
+
+def _ensure_profile():
+    global _PROFILE_LOADED
+    if not _PROFILE_LOADED:
+        load_profile()
+        _PROFILE_LOADED = True
+
+
 def example_1_simple_expectation():
     """Example 1: Calculate expectation value with custom script."""
+    _ensure_profile()
     from renormalizer.model.basis import BasisSHO
     from renormalizer.model import Model
     from renormalizer.model.op import Op
@@ -65,6 +76,7 @@ save_output_parameters({
 
 def example_2_time_evolution():
     """Example 2: Custom time evolution workflow."""
+    _ensure_profile()
     from renormalizer.model.basis import BasisSHO
     from renormalizer.model import Model
     from renormalizer.model.op import Op
@@ -144,6 +156,7 @@ save_mps(mps, 'output_mps.npz', f'Evolved state after {n_steps} steps')
 
 def example_3_multi_observable_scan():
     """Example 3: Scan multiple observables."""
+    _ensure_profile()
     from renormalizer.model.basis import BasisSHO
     from renormalizer.model import Model
     from renormalizer.model.op import Op
@@ -182,13 +195,9 @@ for i in range(len(model)):
         observables[f'correlation_{i}_{j}'] = value
 
 # 3. Entanglement entropy
-from renormalizer.utils import entropy
-entropies = []
-for i in range(len(model) - 1):
-    s = entropy(mps, i)
-    entropies.append(s)
+entropies = [float(s) for s in mps.calc_entropy("bond")]
 observables['entanglement_entropy'] = entropies
-observables['mean_entropy'] = np.mean(entropies)
+observables['mean_entropy'] = float(np.mean(entropies))
 
 # Save all observables
 save_output_parameters(observables)
@@ -218,6 +227,7 @@ save_output_parameters(observables)
 
 def example_4_custom_analysis():
     """Example 4: Custom analysis without Reno data."""
+    _ensure_profile()
     from aiida.orm import Code
 
     # Define a script that doesn't need Reno objects

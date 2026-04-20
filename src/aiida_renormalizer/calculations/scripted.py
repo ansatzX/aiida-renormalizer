@@ -107,6 +107,10 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
             required=False,
             help="Additional scalar parameters for script",
         )
+        try:
+            spec.inputs["metadata"]["options"]["parser_name"].default = "reno.scripted"
+        except (TypeError, KeyError, AttributeError):
+            pass
 
         # Outputs (flexible, detected by parser)
         spec.output(

@@ -15,6 +15,8 @@ from .sweep import (
 )
 from .correction_vector import CorrectionVectorWorkChain
 from .charge_diffusion import ChargeDiffusionWorkChain
+from .bath_mpo_pipeline import BathMpoPipelineWorkChain
+from .bath_spin_boson_model import BathSpinBosonModelWorkChain
 from .spin_boson import SpinBosonWorkChain
 from .vibronic import VibronicWorkChain
 from .ttn_ground_state import TtnGroundStateWorkChain
@@ -36,6 +38,8 @@ __all__ = [
     "FrequencySweepWorkChain",
     "CorrectionVectorWorkChain",
     "ChargeDiffusionWorkChain",
+    "BathMpoPipelineWorkChain",
+    "BathSpinBosonModelWorkChain",
     "SpinBosonWorkChain",
     "VibronicWorkChain",
     "TtnGroundStateWorkChain",

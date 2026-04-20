@@ -43,7 +43,7 @@ The design goal is:
 ### Runtime
 
 ```bash
-pip install aiida-renormalizer
+pip install git+https://github.com/ansatzX/aiida-renormalizer
 ```
 
 ### Development
@@ -58,12 +58,19 @@ pip install -e ".[dev]"
 
 For production usage, use PostgreSQL plus RabbitMQ.
 
-### macOS example
+### Conda example
 
 ```bash
-brew install postgresql@16 rabbitmq
-brew services start postgresql@16
-brew services start rabbitmq
+conda create -n aiida -c conda-forge python=3.12 postgresql rabbitmq aiida-core=2.8.0
+conda activate aiida
+
+# Initialize and start PostgreSQL inside the conda environment
+mkdir -p "$CONDA_PREFIX/var/postgresql"
+initdb -D "$CONDA_PREFIX/var/postgresql"
+pg_ctl -D "$CONDA_PREFIX/var/postgresql" -l "$CONDA_PREFIX/var/postgresql/logfile" start
+
+# Start RabbitMQ inside the conda environment
+rabbitmq-server -detached
 ```
 
 ### Create database and profile
@@ -138,6 +145,20 @@ result = engine.run(
 print("Final state:", result["final_mps"].pk)
 ```
 
+## TTNS Symbolic Example
+
+Use the symbolic TTNS TDVP-PS example when you want setup and runtime construction to stay separated.
+
+```bash
+# one-shot
+verdi run examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py
+
+# multi-step verdi flow
+bash examples/ttn/sbm_ttns_tdvp_ps/run_via_verdi.sh
+```
+
+The example uses `reno.ttns_symbolic_evolve` and stores artifacts under `<repo>/tmp` by default.
+
 ## `verdi` Quickstart
 
 ### Ground state
@@ -149,6 +170,53 @@ verdi reno ground-state \
   -C renormalizer@localhost \
   --artifact-storage-base /data/reno-artifacts
 ```
+
+Minimal `basis.toml`:
+
+```toml
+[[basis]]
+type = "BasisHalfSpin"
+dof = "spin"
+
+[basis.params]
+sigmaqn = [0, 0]
+
+[[basis]]
+type = "BasisSHO"
+dof = "v0"
+
+[basis.params]
+omega = 1.0
+nbas = 6
+```
+
+Minimal `model.toml`:
+
+```toml
+[[hamiltonian]]
+symbol = "sigma_x"
+dofs = "spin"
+factor = 0.4
+
+[[hamiltonian]]
+symbol = "sigma_z"
+dofs = "spin"
+factor = 0.05
+
+[[hamiltonian]]
+symbol = "b^\\dagger b"
+dofs = "v0"
+factor = 1.0
+
+[[hamiltonian]]
+symbol = "sigma_z x"
+dofs = ["spin", "v0"]
+factor = 0.08
+```
+
+Ready-to-copy files are included at:
+- `examples/cli_inputs/basis.toml`
+- `examples/cli_inputs/model.toml`
 
 ### Time evolution
 
@@ -232,9 +300,15 @@ uv run python -m pytest -q tests
 ## Requirements
 
 - Python >= 3.10
-- `aiida-core>=2.6,<3`
+- `aiida-core==2.8.0`
 - `renormalizer>=0.0.11`
 - `numpy<2.0`
+
+## Compatibility Notes
+
+- The plugin drivers target current Renormalizer public APIs (`renormalizer.utils.configs`), not legacy `renormalizer.parameter`.
+- For AiiDA 2.8.0 environments, use `verdi run ...` for script-style launches.
+- Some advanced Renormalizer branches are upstream-limited and may raise `NotImplementedError` depending on model/configuration (for example complex Kubo coupling paths).
 
 ## License
 

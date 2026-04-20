@@ -16,7 +16,7 @@ from aiida_renormalizer.data import ModelData, MpsData, MpoData
 class CorrectionVectorCalcJob(RenoBaseCalcJob):
     """Correction vector calculation for frequency-domain spectra.
 
-    Corresponds to Reno API: SpectraZtCV or SpectraFtCV
+    Corresponds to Reno API: SpectraZtCV
 
     Uses DDMRG (density matrix renormalization group for dynamical properties)
     to compute frequency-resolved spectra without time propagation.

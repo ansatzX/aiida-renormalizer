@@ -236,7 +236,7 @@ def test_parser_auto_type_conversion(simple_model, simple_mps, scripted_parser):
         )
         artifact_base = Path(tmpdir) / "parsed-artifacts"
         mock_node = MagicMock()
-        mock_node.inputs.metadata.options.get.side_effect = (
+        mock_node.get_option.side_effect = (
             lambda key, default=None: {
                 'artifact_storage_backend': 'posix',
                 'artifact_storage_base': str(artifact_base),
@@ -284,7 +284,7 @@ def test_parser_mpdm_detection(simple_model, scripted_parser):
         )
         artifact_base = Path(tmpdir) / "parsed-artifacts"
         mock_node = MagicMock()
-        mock_node.inputs.metadata.options.get.side_effect = (
+        mock_node.get_option.side_effect = (
             lambda key, default=None: {
                 'artifact_storage_backend': 'posix',
                 'artifact_storage_base': str(artifact_base),

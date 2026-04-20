@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
 from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
-from aiida_renormalizer.data import BasisTreeData, TTNSData, TtnoData
+from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TtnoData
 
 
 class TtnGroundStateWorkChain(WorkChain):
@@ -45,7 +45,7 @@ class TtnGroundStateWorkChain(WorkChain):
             required=False,
             help="Initial TTNS guess (random if not provided)",
         )
-        spec.input("config", valid_type=orm.Dict, required=False, help="Optimization configuration")
+        spec.input("config", valid_type=ConfigData, required=False, help="Optimization configuration")
         spec.input(
             "energy_convergence",
             valid_type=orm.Float,

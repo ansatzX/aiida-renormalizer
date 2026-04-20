@@ -178,6 +178,8 @@ class TestTtnsEvolveCalcJob:
         assert "initial_ttns" in input_names
         assert "ttno" in input_names
         assert "config" in input_names
+        assert "dt" in input_names
+        assert "nsteps" in input_names
 
         # Check outputs
         output_calls = [call for call in spec.output.call_args_list]
@@ -194,6 +196,76 @@ class TestTtnsEvolveCalcJob:
         pkg_dir = Path(aiida_renormalizer.__file__).parent
         template_path = pkg_dir / "templates" / "ttns_evolve_driver.py.jinja"
 
+        assert template_path.exists(), f"Template not found: {template_path}"
+
+
+class TestTtnsSymbolicEvolveCalcJob:
+    """Tests for TtnsSymbolicEvolveCalcJob."""
+
+    def test_calcjob_defined(self):
+        from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
+            TtnsSymbolicEvolveCalcJob,
+        )
+
+        assert hasattr(TtnsSymbolicEvolveCalcJob, "_template_name")
+        assert (
+            TtnsSymbolicEvolveCalcJob._template_name
+            == "ttns_symbolic_evolve_driver.py.jinja"
+        )
+
+    def test_inputs_outputs(self):
+        from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
+            TtnsSymbolicEvolveCalcJob,
+        )
+        from unittest.mock import Mock
+
+        spec = Mock()
+        spec.input = Mock()
+        spec.output = Mock()
+        spec.exit_code = Mock()
+        spec.options = {}
+
+        TtnsSymbolicEvolveCalcJob.define(spec)
+
+        input_names = [call[0][0] for call in spec.input.call_args_list]
+        assert "symbolic_inputs" in input_names
+        assert "dt" in input_names
+        assert "nsteps" in input_names
+        assert "method" in input_names
+
+        output_names = [call[0][0] for call in spec.output.call_args_list]
+        assert "output_ttns" in output_names
+        assert "output_basis_tree" in output_names
+
+    def test_symbolic_validator(self):
+        from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
+            TtnsSymbolicEvolveCalcJob,
+        )
+
+        good = {
+            "basis": [
+                {"kind": "half_spin", "dof": "spin"},
+                {"kind": "sho", "dof": "v0", "omega": 1.0, "nbas": 4},
+            ],
+            "hamiltonian": [{"symbol": "sigma_x", "dofs": "spin"}],
+            "tree_type": "binary",
+            "m_max": 16,
+        }
+        bad = {
+            "basis": [{"kind": "sho", "dof": "v0"}],  # missing omega/nbas
+            "hamiltonian": [],
+        }
+
+        assert TtnsSymbolicEvolveCalcJob._validate_symbolic_dict(good) is None
+        assert TtnsSymbolicEvolveCalcJob._validate_symbolic_dict(bad) is not None
+
+    def test_template_exists(self):
+        from pathlib import Path
+
+        import aiida_renormalizer
+
+        pkg_dir = Path(aiida_renormalizer.__file__).parent
+        template_path = pkg_dir / "templates" / "ttns_symbolic_evolve_driver.py.jinja"
         assert template_path.exists(), f"Template not found: {template_path}"
 
 

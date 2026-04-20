@@ -9,7 +9,7 @@ version = "0.1.0"
 description = "AiiDA plugin for the Renormalizer tensor network package"
 requires-python = ">=3.10"
 dependencies = [
-    "aiida-core>=2.6,<3",
+    "aiida-core>=2.8,<3",
     "renormalizer",
     "numpy<2.0",
     "jinja2>=3",  # Required for CalcJob driver template rendering
@@ -56,11 +56,16 @@ dev = [
 "reno.correction_vector" = "aiida_renormalizer.calculations.spectra.correction_vector:CorrectionVectorCalcJob"
 "reno.charge_diffusion" = "aiida_renormalizer.calculations.spectra.charge_diffusion:ChargeDiffusionCalcJob"
 "reno.spectral_function" = "aiida_renormalizer.calculations.spectra.spectral_function:SpectralFunctionCalcJob"
+# Bath pipeline CalcJobs
+"reno.bath_spectral_density" = "aiida_renormalizer.calculations.bath.bath_spectral_density:BathSpectralDensityCalcJob"
+"reno.bath_discretization" = "aiida_renormalizer.calculations.bath.bath_discretization:BathDiscretizationCalcJob"
+"reno.bath_to_mpo_coeff" = "aiida_renormalizer.calculations.bath.bath_to_mpo_coeff:BathToMpoCoeffCalcJob"
 # L3 Scripted CalcJob
 "reno.script" = "aiida_renormalizer.calculations.scripted:RenoScriptCalcJob"
 # TTN CalcJobs
 "reno.ttn_optimize" = "aiida_renormalizer.calculations.ttn.optimize_ttns:OptimizeTtnsCalcJob"
 "reno.ttns_evolve" = "aiida_renormalizer.calculations.ttn.ttns_evolve:TtnsEvolveCalcJob"
+"reno.ttns_symbolic_evolve" = "aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve:TtnsSymbolicEvolveCalcJob"
 "reno.ttns_expectation" = "aiida_renormalizer.calculations.ttn.observables:TtnsExpectationCalcJob"
 "reno.ttns_entropy" = "aiida_renormalizer.calculations.ttn.observables:TtnsEntropyCalcJob"
 "reno.ttns_mutual_info" = "aiida_renormalizer.calculations.ttn.observables:TtnsMutualInfoCalcJob"
@@ -91,6 +96,8 @@ dev = [
 # L4 WorkChains - CV + Advanced Dynamics (M8)
 "reno.correction_vector" = "aiida_renormalizer.workchains.correction_vector:CorrectionVectorWorkChain"
 "reno.charge_diffusion" = "aiida_renormalizer.workchains.charge_diffusion:ChargeDiffusionWorkChain"
+"reno.bath_mpo_pipeline" = "aiida_renormalizer.workchains.bath_mpo_pipeline:BathMpoPipelineWorkChain"
+"reno.bath_spin_boson_model" = "aiida_renormalizer.workchains.bath_spin_boson_model:BathSpinBosonModelWorkChain"
 "reno.spin_boson" = "aiida_renormalizer.workchains.spin_boson:SpinBosonWorkChain"
 "reno.vibronic" = "aiida_renormalizer.workchains.vibronic:VibronicWorkChain"
 # TTN WorkChains (M11)

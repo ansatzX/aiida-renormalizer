@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+
 import numpy as np
 import pytest
 from aiida import orm
@@ -118,3 +119,24 @@ class TestRenoBaseParser:
 
         result = RenoBaseParser._validate_physical_constraints(None, params)
         assert result['passed'] is True
+
+    def test_get_artifact_location_uses_node_options(self):
+        """Artifact location should read CalcJobNode options, not input links."""
+        from aiida_renormalizer.parsers.reno_base import RenoBaseParser
+
+        mock_node = type("Node", (), {})()
+        mock_node.uuid = "abc123"
+        mock_node.get_option = lambda key: {
+            "artifact_storage_backend": "posix",
+            "artifact_storage_base": "/tmp/artifacts",
+            "artifact_relative_path": "custom/path.npz",
+        }.get(key)
+
+        parser = object.__new__(RenoBaseParser)
+        from unittest.mock import patch
+
+        with patch.object(type(parser), "node", new_callable=lambda: property(lambda self: mock_node)):
+            backend, base, relative = RenoBaseParser._get_artifact_location(parser, "ignored.npz")
+        assert backend == "posix"
+        assert base == "/tmp/artifacts"
+        assert relative == "custom/path.npz"

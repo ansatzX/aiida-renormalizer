@@ -174,5 +174,6 @@ class KuboCalcJob(RenoBaseCalcJob):
                 json.dump(self.inputs.ievolve_config.get_dict(), f, indent=2)
 
         if "compress_config" in self.inputs:
+            payload = self._sanitize_compress_config_payload(self.inputs.compress_config.get_dict())
             with folder.open("input_compress_config.json", "w") as f:
-                json.dump(self.inputs.compress_config.get_dict(), f, indent=2)
+                json.dump(payload, f, indent=2)

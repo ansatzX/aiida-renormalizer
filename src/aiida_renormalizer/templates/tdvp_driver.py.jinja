@@ -46,7 +46,7 @@ def load_config(input_file='input_config.json'):
         with open(input_file, 'r') as f:
             data = json.load(f)
         # Reconstruct EvolveConfig from data
-        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        from renormalizer.utils.configs import EvolveConfig, EvolveMethod
         config_class = data.get('config_class', 'EvolveConfig')
         fields = data.get('fields', {})
         # Convert method string to enum if present
@@ -55,7 +55,7 @@ def load_config(input_file='input_config.json'):
         return EvolveConfig(**fields)
     except FileNotFoundError:
         # Return default config with TDVP method
-        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        from renormalizer.utils.configs import EvolveConfig, EvolveMethod
         return EvolveConfig(method=EvolveMethod.tdvp_ps)
 
 # ============================================================================
@@ -101,21 +101,23 @@ if __name__ == '__main__':
     # Compute number of steps
     n_steps = int(total_time / dt)
 
-    # Trajectory storage
-    trajectory_times = []
+    # Trajectory storage includes the initial state at t=0.
+    trajectory_times = [0.0]
     trajectory_energies = []
     trajectory_bond_dims = []
 
     # Perform real-time evolution
     current_mps = mps
     initial_energy = current_mps.expectation(mpo).real
+    trajectory_energies.append(initial_energy)
+    trajectory_bond_dims.append([int(d) for d in current_mps.bond_dims])
 
-    for step in range(n_steps):
+    for step in range(1, n_steps + 1):
         # Evolve by dt (real time)
         current_mps = current_mps.evolve(mpo, dt, normalize=False)
 
         # Record trajectory at intervals
-        if step % trajectory_interval == 0:
+        if (step % trajectory_interval == 0) or (step == n_steps):
             t = step * dt
             energy = current_mps.expectation(mpo).real
             bond_dims = [int(d) for d in current_mps.bond_dims]
@@ -126,7 +128,7 @@ if __name__ == '__main__':
 
     # Final state
     final_mps = current_mps
-    final_energy = trajectory_energies[-1]
+    final_energy = current_mps.expectation(mpo).real
 
     # Check energy conservation
     energy_drift = abs(final_energy - initial_energy)

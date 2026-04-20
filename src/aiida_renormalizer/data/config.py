@@ -34,8 +34,6 @@ _COMPRESS_FIELDS = [
     ("vguess_m", "vguess_m"),
     ("dump_matrix_size", "dump_matrix_size"),
     ("dump_matrix_dir", "dump_matrix_dir"),
-    ("ofs", "ofs"),
-    ("ofs_swap_jw", "ofs_swap_jw"),
 ]
 
 
@@ -46,7 +44,7 @@ class ConfigData(Data):
     def from_config(cls, config: t.Any) -> ConfigData:
         """Serialize a Reno config object into a ConfigData node.
 
-        Validates OFS constraints for CompressConfig.
+        Serializes only plugin-supported compress parameters.
         """
         from renormalizer.utils.configs import CompressConfig, EvolveConfig, OptimizeConfig
 
@@ -59,14 +57,6 @@ class ConfigData(Data):
         elif isinstance(config, OptimizeConfig):
             fields = {f: to_native(getattr(config, f)) for f in _OPTIMIZE_FIELDS}
         elif isinstance(config, CompressConfig):
-            # OFS validation
-            if config.ofs is not None:
-                from renormalizer.utils.configs import CompressCriteria
-                if config.criteria != CompressCriteria.fixed:
-                    raise ValueError(
-                        "OFS requires criteria=CompressCriteria.fixed. "
-                        f"Got criteria={config.criteria}."
-                    )
             fields = {}
             for attr_name, _ in _COMPRESS_FIELDS:
                 fields[attr_name] = to_native(getattr(config, attr_name))
@@ -83,7 +73,6 @@ class ConfigData(Data):
             CompressCriteria,
             EvolveConfig,
             EvolveMethod,
-            OFS,
             OptimizeConfig,
         )
 
@@ -110,8 +99,6 @@ class ConfigData(Data):
                 val = fields.get(attr_name)
                 if attr_name == "criteria" and val is not None:
                     val = CompressCriteria[val]
-                elif attr_name == "ofs" and val is not None:
-                    val = OFS[val]
                 elif attr_name == "dump_matrix_size" and val is None:
                     val = np.inf  # Restore sentinel
                 elif attr_name == "vguess_m" and isinstance(val, list):

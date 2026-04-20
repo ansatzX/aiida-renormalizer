@@ -46,7 +46,7 @@ def load_config(input_file='input_config.json'):
         with open(input_file, 'r') as f:
             data = json.load(f)
         # Reconstruct EvolveConfig from data
-        from renormalizer.parameter import EvolveConfig, EvolveMethod
+        from renormalizer.utils.configs import EvolveConfig, EvolveMethod
         config_class = data.get('config_class', 'EvolveConfig')
         fields = data.get('fields', {})
         # Convert method string to enum if present
@@ -55,7 +55,7 @@ def load_config(input_file='input_config.json'):
         return EvolveConfig(**fields)
     except FileNotFoundError:
         # Return default config
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         return EvolveConfig()
 
 # ============================================================================

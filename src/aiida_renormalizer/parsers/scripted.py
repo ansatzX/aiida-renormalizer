@@ -162,15 +162,12 @@ class ScriptedParser(Parser):
 
     def _get_artifact_location(self, filename: str) -> tuple[str, str, str]:
         """Return storage backend/base/path for parsed wavefunction artifacts."""
-        options = self.node.inputs.metadata.options
-        storage_backend = options.get('artifact_storage_backend', 'posix')
-        storage_base = options.get(
-            'artifact_storage_base',
-            str(Path(tempfile.gettempdir()) / 'aiida-renormalizer-artifacts'),
+        storage_backend = self.node.get_option('artifact_storage_backend') or 'posix'
+        storage_base = self.node.get_option('artifact_storage_base') or str(
+            Path(tempfile.gettempdir()) / 'aiida-renormalizer-artifacts'
         )
-        relative_path = options.get(
-            'artifact_relative_path',
-            f"parsed/{getattr(self.node, 'uuid', 'unstored')}/{filename}",
+        relative_path = self.node.get_option('artifact_relative_path') or (
+            f"parsed/{getattr(self.node, 'uuid', 'unstored')}/{filename}"
         )
         return storage_backend, storage_base, relative_path
 

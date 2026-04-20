@@ -1,0 +1,19 @@
+[[hamiltonian]]
+symbol = "sigma_x"
+dofs = "spin"
+factor = 0.4
+
+[[hamiltonian]]
+symbol = "sigma_z"
+dofs = "spin"
+factor = 0.05
+
+[[hamiltonian]]
+symbol = "b^\\dagger b"
+dofs = "v0"
+factor = 1.0
+
+[[hamiltonian]]
+symbol = "sigma_z x"
+dofs = ["spin", "v0"]
+factor = 0.08

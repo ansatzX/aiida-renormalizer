@@ -47,11 +47,11 @@ def load_config(input_file='input_config.json'):
     try:
         with open(input_file, 'r') as f:
             data = json.load(f)
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         fields = data.get('fields', {})
         return EvolveConfig(**fields)
     except FileNotFoundError:
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         return EvolveConfig()
 
 def load_evolve_config(input_file='input_ievolve_config.json'):
@@ -59,11 +59,11 @@ def load_evolve_config(input_file='input_ievolve_config.json'):
     try:
         with open(input_file, 'r') as f:
             data = json.load(f)
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         fields = data.get('fields', {})
         return EvolveConfig(**fields)
     except FileNotFoundError:
-        from renormalizer.parameter import EvolveConfig
+        from renormalizer.utils.configs import EvolveConfig
         return EvolveConfig()
 
 def load_compress_config(input_file='input_compress_config.json'):
@@ -71,11 +71,11 @@ def load_compress_config(input_file='input_compress_config.json'):
     try:
         with open(input_file, 'r') as f:
             data = json.load(f)
-        from renormalizer.parameter import CompressConfig
+        from renormalizer.utils.configs import CompressConfig
         fields = data.get('fields', {})
         return CompressConfig(**fields)
     except FileNotFoundError:
-        from renormalizer.parameter import CompressConfig
+        from renormalizer.utils.configs import CompressConfig
         return CompressConfig()
 
 # ============================================================================

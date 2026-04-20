@@ -40,13 +40,13 @@ def load_config(input_file='input_config.json'):
         with open(input_file, 'r') as f:
             data = json.load(f)
         # Reconstruct CompressConfig from data
-        from renormalizer.parameter import CompressConfig
+        from renormalizer.utils.configs import CompressConfig
         config_class = data.get('config_class', 'CompressConfig')
         fields = data.get('fields', {})
         return CompressConfig(**fields)
     except FileNotFoundError:
         # Return default config
-        from renormalizer.parameter import CompressConfig
+        from renormalizer.utils.configs import CompressConfig
         return CompressConfig()
 
 # ============================================================================

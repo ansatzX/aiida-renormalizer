@@ -19,6 +19,8 @@ def test_workchain_imports():
         FrequencySweepWorkChain,
         CorrectionVectorWorkChain,
         ChargeDiffusionWorkChain,
+        BathMpoPipelineWorkChain,
+        BathSpinBosonModelWorkChain,
         SpinBosonWorkChain,
         VibronicWorkChain,
     )
@@ -37,6 +39,8 @@ def test_workchain_imports():
     assert FrequencySweepWorkChain is not None
     assert CorrectionVectorWorkChain is not None
     assert ChargeDiffusionWorkChain is not None
+    assert BathMpoPipelineWorkChain is not None
+    assert BathSpinBosonModelWorkChain is not None
     assert SpinBosonWorkChain is not None
     assert VibronicWorkChain is not None
 
@@ -63,6 +67,8 @@ def test_workchain_entry_points():
         "reno.frequency_sweep",
         "reno.correction_vector",
         "reno.charge_diffusion",
+        "reno.bath_mpo_pipeline",
+        "reno.bath_spin_boson_model",
         "reno.spin_boson",
         "reno.vibronic",
     ]
