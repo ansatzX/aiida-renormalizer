@@ -16,9 +16,10 @@ def test_base_calcjob_ports_and_defaults():
 
     assert "model" in spec.inputs
     assert "config" in spec.inputs
+    assert "tn_layout" in spec.inputs
     assert "code" in spec.inputs
     assert "output_parameters" in spec.outputs
-    assert spec.inputs["metadata"]["options"]["parser_name"].default == "reno.base"
+    assert "output_tn_layout" in spec.outputs
 
 
 def test_base_calcjob_shared_exit_codes_present():

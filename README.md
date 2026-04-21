@@ -1,43 +1,18 @@
 # aiida-renormalizer
 
-`aiida-renormalizer` is an AiiDA plugin for tensor-network workflows built on top of Renormalizer. Its job is not to expose raw Renormalizer scripting to end users, but to make those calculations reproducible, restartable, and automation-friendly inside AiiDA.
+AiiDA plugin for Renormalizer tensor-network workflows.
 
-## What This Plugin Is For
+## What This Plugin Does
 
-The plugin provides AiiDA-native building blocks for common tensor-network workloads:
+- Data nodes for models, operators, MPO/MPS/TTNO/TTNS
+- CalcJobs for DMRG, TDVP, spectra, transport, TTN operations
+- WorkChains for multi-step workflows
 
-- AiiDA data nodes for models, operators, basis sets, MPOs, MPSs, TTNOs, and TTNSs
-- CalcJobs for DMRG, TDVP, spectra, transport, and TTN operations
-- WorkChains for multi-step workflows such as ground-state search, time evolution, convergence studies, and spectroscopy
-
-The intended user-facing interfaces are:
-
-- AiiDA Python API
-- `verdi run ...` (script submission)
-
-The intended interface is not “write custom Renormalizer scripts in the README”. Renormalizer remains a runtime dependency of the plugin, but it should stay behind the plugin boundary in normal usage.
-
-Temporary status: the Python LEGO API is under rapid development, and documentation is still being written. Verdi CLI: TODO.
+User interfaces: AiiDA Python API, `verdi run ...`
 
 ## Storage Model
 
-Wavefunction-sized data such as MPS and TTNS are treated as external artifacts.
-
-- AiiDA stores provenance, metadata, and lightweight manifests
-- Large tensor payloads live outside the AiiDA repository
-- Each wavefunction node records a logical artifact address:
-  - `storage_backend`
-  - `storage_base`
-  - `relative_path`
-  - checksum and size metadata
-
-This is deliberate. For large tensor-network calculations, keeping dense wavefunction payloads inside the AiiDA repository quickly becomes awkward for archiving, sharing, and publication.
-
-The design goal is:
-
-- AiiDA tracks the workflow and the scientific object identity
-- external storage holds the heavy payload
-- publication/export steps can remap those artifacts into a shareable bundle
+Wavefunction payloads (MPS/TTNS) stored externally. AiiDA tracks provenance and metadata.
 
 ## Installation
 
@@ -122,105 +97,144 @@ verdi quicksetup \
 verdi daemon start
 ```
 
-## Python API Quickstart
+## Examples
 
-The Python API is meant to work with AiiDA nodes and AiiDA process factories.
+22 example scripts organized into `calcjob/` (low-level) and `workchain/` (high-level) with mirrored MPS/TTN cases.
 
-```python
-from aiida import engine, orm
-from aiida.plugins import DataFactory, WorkflowFactory
-
-ModelData = DataFactory("reno.model")
-MpoData = DataFactory("reno.mpo")
-GroundStateWorkChain = WorkflowFactory("reno.ground_state")
-
-# In the normal plugin workflow, ModelData and MpoData come from
-# previous AiiDA steps, imported inputs, or CLI-assisted setup.
-model = orm.load_node(<model_pk>)
-mpo = orm.load_node(<mpo_pk>)
-code = orm.load_code("renormalizer@localhost")
-
-result = engine.run(
-    GroundStateWorkChain,
-    model=model,
-    mpo=mpo,
-    code=code,
-    energy_convergence=orm.Float(1e-8),
-)
-
-print("Ground-state node:", result["ground_state"].pk)
-print("Energy:", result["energy"].value)
-```
-
-For time evolution:
-
-```python
-from aiida import engine, orm
-from aiida.plugins import WorkflowFactory
-
-TimeEvolutionWorkChain = WorkflowFactory("reno.time_evolution")
-
-result = engine.run(
-    TimeEvolutionWorkChain,
-    model=orm.load_node(<model_pk>),
-    mpo=orm.load_node(<mpo_pk>),
-    initial_mps=orm.load_node(<mps_pk>),
-    total_time=orm.Float(10.0),
-    dt=orm.Float(0.01),
-    code=orm.load_code("renormalizer@localhost"),
-)
-
-print("Final state:", result["final_mps"].pk)
-```
-
-## TTNS Symbolic Example
-
-Use the symbolic TTNS TDVP-PS example when you want setup and runtime construction to stay separated.
-
+TTN example:
 ```bash
-verdi run examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py
+verdi run examples/workchain/ttn/sbm_zt/run_one_shot.py
 ```
 
-The example uses `reno.ttns_symbolic_evolve` and stores artifacts under `<repo>/tmp` by default.
-
-## Publication Bundles (Design Note)
-
-Publication-oriented export is part of the storage design.
-
-- heavy wavefunction files remain external during normal work
-- a publication step can gather them into a bundle directory
-- the bundle includes a stable artifact filename, machine-readable metadata, and a short human-readable README
-
-The previous `verdi reno bundle ...` command path is currently disabled together with the CLI entrypoint and will return in a later phase.
-
-The exported directory is organized like this:
-
-```text
-paper-bundle/
-  README.md
-  manifest.json
-  metadata/
-    summary.json
-  artifacts/
-    mps-<uuid-prefix>.npz
+MPS example:
+```bash
+verdi run examples/workchain/mps/sbm/run_one_shot.py
 ```
 
-`manifest.json` captures provenance, original logical location, exported timestamp, checksum-bearing artifact metadata, and the bundle-relative artifact path. `metadata/summary.json` keeps the most useful node summary fields easy to inspect and script against without reading the full manifest.
+## Publication Bundles
 
-This makes it easier to:
+Wavefunction artifacts are stored externally. Publication bundles can be created with provenance metadata and artifact manifests for sharing/archiving.
 
-- reorganize data before submission
-- share reproducible artifacts with collaborators
-- publish a clean directory tree for supporting information
+CLI export command (`verdi reno bundle ...`) is temporarily disabled during API refactor.
 
 ## Current Scope
 
-The repository currently contains:
+- Data types: ModelData, MPSData, MPOData, OpData, BasisSetData, ConfigData, BasisTreeData, TensorNetworkLayoutData, TTNSData, TTNOData
+- Parsers: RenoBaseParser, ScriptedParser
+- Examples: 22 scripts in `calcjob/` and `workchain/`
 
-- data-layer types for MPS/MPO/TTNS/TTNO/model/basis/config
-- composite calculations and parsers
-- workchains for ground state, time evolution, spectroscopy, transport, and TTN workflows
-- spec-driven examples under `examples/`
+### CalcJobs (33 total)
+
+```mermaid
+graph TB
+    subgraph L1[L1 Atomic]
+        A1[BuildMPO]
+        A2[Expectation]
+        A3[Compress]
+        A4[MaxEntangledMpdm]
+        A5[ModelFromSymbolicSpec]
+    end
+
+    subgraph L15[L1.5 LEGO]
+        L1[ComputeOccupations]
+        L2[ComputeMsd]
+    end
+
+    subgraph L2[L2 Composite]
+        C1[DMRG]
+        C2[ImagTime]
+        C3[TDVP]
+        C4[ThermalProp]
+        C5[Property]
+    end
+
+    subgraph Spectra[L2 Spectra/Transport]
+        S1[SpectraZeroT]
+        S2[SpectraFiniteT]
+        S3[Kubo]
+        S4[CorrectionVector]
+        S5[ChargeDiffusion]
+        S6[SpectralFunction]
+    end
+
+    subgraph Bath[Bath Pipeline]
+        B1[BathSpectralDensity]
+        B2[OhmicRenormModes]
+        B3[BathDiscretization]
+        B4[BathSpinBosonModel]
+        B5[SbmSymbolicSpecFromModes]
+        B6[BathToMPOCoeff]
+    end
+
+    subgraph TTN[TTN]
+        T1[OptimizeTTNS]
+        T2[TTNSymbolicModel]
+        T3[TTNSEvolve]
+        T4[TTNSSymbolicEvolve]
+        T5[TTNSExpectation]
+        T6[TTNSEntropy]
+        T7[TTNSMutualInfo]
+        T8[TTNSRdm]
+    end
+
+    subgraph L3[L3 Scripted]
+        SC[RenoScriptCalcJob]
+    end
+```
+
+### WorkChains (28 total)
+
+```mermaid
+graph TB
+    subgraph Core[Core]
+        W1[RenoRestartWorkChain]
+        W2[TimeEvolutionWorkChain]
+        W3[GroundStateWorkChain]
+        W4[AbsorptionWorkChain]
+        W5[ConvergenceWorkChain]
+    end
+
+    subgraph Extended[Extended]
+        W6[ThermalStateWorkChain]
+        W7[KuboTransportWorkChain]
+        W8[CustomPipelineWorkChain]
+    end
+
+    subgraph Sweeps[Sweep WorkChains]
+        W9[ParameterSweepWorkChain]
+        W10[TemperatureSweepWorkChain]
+        W11[BondDimensionSweepWorkChain]
+        W12[FrequencySweepWorkChain]
+    end
+
+    subgraph Advanced[Advanced Dynamics]
+        W13[CorrectionVectorWorkChain]
+        W14[ChargeDiffusionWorkChain]
+    end
+
+    subgraph Bath[Bath Pipelines]
+        W15[BathMPOPipelineWorkChain]
+        W16[BathSpinBosonModelWorkChain]
+        W17[OhmicRenormModesWorkChain]
+        W18[SbmModelFromModesWorkChain]
+        W19[ModelToMPOWorkChain]
+        W20[MPOToInitialMPSWorkChain]
+        W21[MPSDynamicsWorkChain]
+    end
+
+    subgraph Models[Model WorkChains]
+        W22[SpinBosonWorkChain]
+        W23[VibronicWorkChain]
+    end
+
+    subgraph TTN[TTN WorkChains]
+        W24[TTNGroundStateWorkChain]
+        W25[TTNTimeEvolutionWorkChain]
+        W26[TTNMPSComparisonWorkChain]
+        W27[TTNSymbolicModelWorkChain]
+        W28[TTNSymbolicDynamicsWorkChain]
+    end
+```
 
 ## Tests
 

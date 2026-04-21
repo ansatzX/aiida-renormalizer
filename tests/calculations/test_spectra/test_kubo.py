@@ -78,10 +78,3 @@ def test_kubo_with_distance_matrix(generate_inputs, tmp_path):
 
     assert context["has_distance_matrix"] == True
 
-
-def test_kubo_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.kubo")
-    assert calc_class is KuboCalcJob

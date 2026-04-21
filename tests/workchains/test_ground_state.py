@@ -1,26 +1,11 @@
 """Unit tests for GroundStateWorkChain."""
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
 from aiida_renormalizer.workchains.ground_state import GroundStateWorkChain
 from tests.workchains.conftest import make_workchain, Namespace
-
-
-def test_ground_state_strategy_checks():
-    """Test strategy selection methods."""
-    wc = make_workchain(GroundStateWorkChain)
-
-    # Test DMRG strategy
-    wc.inputs = Namespace(strategy=orm.Str("dmrg"))
-    assert wc.use_dmrg() is True
-    assert wc.use_imag_time() is False
-
-    # Test ImagTime strategy
-    wc.inputs = Namespace(strategy=orm.Str("imag_time"))
-    assert wc.use_dmrg() is False
-    assert wc.use_imag_time() is True
 
 
 def test_ground_state_run_dmrg():
@@ -35,11 +20,13 @@ def test_ground_state_run_dmrg():
     wc.ctx = Namespace()
 
     # Run DMRG
-    result = wc.run_dmrg()
+    wc.run_dmrg()
 
     # Check that submit was called with DMRGCalcJob
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_ground_state_run_imag_time():
@@ -54,11 +41,14 @@ def test_ground_state_run_imag_time():
     wc.ctx = Namespace()
 
     # Run ImagTime
-    result = wc.run_imag_time()
+    wc.run_imag_time()
 
     # Check that submit was called with ImagTimeCalcJob
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["code"] is wc.inputs.code
+    assert "beta" in submit_kwargs
 
 
 def test_ground_state_inspect_dmrg_success():

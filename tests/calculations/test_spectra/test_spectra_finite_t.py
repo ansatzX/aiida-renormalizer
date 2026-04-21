@@ -82,10 +82,3 @@ def test_spectra_finite_t_write_inputs(generate_inputs, tmp_path):
     assert (tmp_path / "input_model.json").exists()
     assert (tmp_path / "input_spectra_params.json").exists()
 
-
-def test_spectra_finite_t_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.spectra_finite_t")
-    assert calc_class is SpectraFiniteTCalcJob

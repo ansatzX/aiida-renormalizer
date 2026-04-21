@@ -1,0 +1,70 @@
+"""Driver script for MaxEntangledMpdmCalcJob."""
+import json
+import numpy as np
+
+from renormalizer.mps import MpDm
+from renormalizer.model import BasisHalfSpin, BasisSHO, Model, Op
+
+if not hasattr(np, "product"):
+    np.product = np.prod
+
+
+def load_model(input_file="input_model.json"):
+    with open(input_file, "r") as f:
+        data = json.load(f)
+
+    basis = []
+    for b in data["basis"]:
+        kind = b["kind"]
+        if kind == "half_spin":
+            basis.append(BasisHalfSpin(b["dof"], b.get("sigmaqn", [0, 0])))
+        elif kind == "sho":
+            basis.append(BasisSHO(b["dof"], b["omega"], int(b["nbas"])))
+        else:
+            raise ValueError(f"Unsupported basis kind: {kind}")
+
+    ham_terms = [Op(t["symbol"], t["dofs"], t.get("factor", 1.0)) for t in data["ham_opsum"]]
+    dipole = None
+    if "dipole" in data:
+        dipole = [Op(t["symbol"], t["dofs"], t.get("factor", 1.0)) for t in data["dipole"]]
+    return Model(basis, ham_terms, dipole=dipole)
+
+
+def save_output_parameters(params, output_file="output_parameters.json"):
+    with open(output_file, "w") as f:
+        json.dump(params, f, indent=2)
+
+
+def save_mps(mps, output_file="output_mps.npz", description=""):
+    mps.dump(output_file.rstrip(".npz"))
+    with np.load(output_file, allow_pickle=True) as data:
+        arrays = dict(data)
+    arrays["description"] = description
+    np.savez(output_file, **arrays)
+
+
+if __name__ == "__main__":
+    model = load_model()
+
+    with open("input_max_entangled.json", "r") as f:
+        params = json.load(f)
+    space = str(params.get("space", "GS"))
+
+    if space == "GS":
+        mpdm = MpDm.max_entangled_gs(model)
+    elif space == "EX":
+        mpdm = MpDm.max_entangled_ex(model)
+    else:
+        raise ValueError(f"Unsupported space: {space}")
+
+    save_mps(mpdm, "output_mps.npz", f"Max-entangled MpDm ({space})")
+
+    save_output_parameters(
+        {
+            "calcjob_class": "MaxEntangledMpdmCalcJob",
+            "calc_type": "thermal_initial_state",
+            "space": space,
+            "bond_dims": [int(d) for d in mpdm.bond_dims],
+            "converged": True,
+        }
+    )

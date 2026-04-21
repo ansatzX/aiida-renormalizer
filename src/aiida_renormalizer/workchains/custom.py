@@ -60,7 +60,7 @@ class CustomPipelineWorkChain(WorkChain):
         'spectra_finite_t': ('aiida_renormalizer.calculations.spectra', 'SpectraFiniteTCalcJob'),
         'kubo': ('aiida_renormalizer.calculations.spectra', 'KuboCalcJob'),
         'script': ('aiida_renormalizer.calculations.scripted', 'RenoScriptCalcJob'),
-        'bath_spin_boson_model': ('aiida_renormalizer.workchains', 'BathSpinBosonModelWorkChain'),
+        'bath_spin_boson_model': ('aiida_renormalizer.calculations.bath', 'BathSpinBosonModelCalcJob'),
     }
 
     @classmethod
@@ -157,6 +157,7 @@ class CustomPipelineWorkChain(WorkChain):
     def dispatch_step(self):
         """Submit appropriate CalcJob based on step specification."""
         import importlib
+        from aiida.engine import CalcJob
 
         # Get current step
         step_spec = self.ctx.pipeline[self.ctx.step_index]
@@ -175,8 +176,13 @@ class CustomPipelineWorkChain(WorkChain):
         try:
             module = importlib.import_module(module_name)
             CalcJobClass = getattr(module, class_name)
+            if not issubclass(CalcJobClass, CalcJob):
+                raise TypeError(f"{class_name} is not a CalcJob")
         except (ImportError, AttributeError) as e:
             self.report(f"ERROR: Failed to import {class_name}: {e}")
+            return self.exit_codes.ERROR_UNKNOWN_STEP_TYPE
+        except TypeError as e:
+            self.report(f"ERROR: {e}")
             return self.exit_codes.ERROR_UNKNOWN_STEP_TYPE
 
         # Build inputs

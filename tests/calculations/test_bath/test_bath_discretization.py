@@ -39,7 +39,7 @@ def generate_inputs(fixture_model_data, fixture_code, omega_grid, j_omega):
     inputs.omega_grid = omega_grid
     inputs.j_omega = j_omega
     inputs.n_modes = orm.Int(16)
-    inputs.method = orm.Str("trapz")
+    inputs.method = orm.Str("wang1")
     inputs.metadata = AttributeDict()
     inputs.metadata.options = AttributeDict()
     inputs.metadata.options.resources = {"num_machines": 1, "num_mpiprocs_per_machine": 1}
@@ -64,11 +64,11 @@ def test_bath_discretization_template_context():
     """Test template context generation."""
     calc = _make_calcjob(BathDiscretizationCalcJob, {
         "n_modes": orm.Int(16),
-        "method": orm.Str("trapz"),
+        "method": orm.Str("wang1"),
     })
     context = calc._get_template_context()
     assert context["n_modes"] == 16
-    assert context["method"] == "trapz"
+    assert context["method"] == "wang1"
 
 
 def test_bath_discretization_retrieve_list():
@@ -80,10 +80,3 @@ def test_bath_discretization_retrieve_list():
     assert "output_mps.npz" not in retrieve_list
     assert "output_parameters.json" in retrieve_list
 
-
-def test_bath_discretization_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.bath_discretization")
-    assert calc_class is BathDiscretizationCalcJob

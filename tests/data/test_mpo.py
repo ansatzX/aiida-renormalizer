@@ -11,14 +11,18 @@ class TestMPOData:
     def test_roundtrip_external_artifact(self, aiida_profile, sho_model, sho_mpo, tmp_path):
         from aiida_renormalizer.data.model import ModelData
         from aiida_renormalizer.data.mpo import MPOData
+        from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
+        layout_node = TensorNetworkLayoutData.from_chain([str(dof) for dof in sho_model.dofs])
+        layout_node.store()
 
         artifact_base = tmp_path / "mpo-artifacts"
         mpo_node = MPOData.from_mpo(
             sho_mpo,
             model_node,
+            layout_node,
             storage_backend="posix",
             storage_base=str(artifact_base),
             relative_path="operators/hamiltonian.npz",
@@ -31,6 +35,8 @@ class TestMPOData:
         assert mpo_node.artifact_metadata["content_hash"] == hashlib.sha256(
             artifact_path.read_bytes()
         ).hexdigest()
+        assert mpo_node.tn_layout_data is not None
+        assert mpo_node.tn_layout_data.uuid == layout_node.uuid
 
         restored = mpo_node.load_mpo()
         assert len(restored) == len(sho_mpo)

@@ -1,6 +1,8 @@
 """BasisTreeData node for Renormalizer BasisTree persistence."""
 from __future__ import annotations
 
+import io
+import pickle
 import typing as t
 
 from aiida.orm import Data
@@ -42,6 +44,10 @@ class BasisTreeData(Data):
         tree_data = _serialize_basis_tree(basis_tree)
         write_json_to_repository(node, tree_data, "tree_structure.json")
 
+        # Repository: basis_tree.pkl (compiled tree cache for fast reuse across CalcJobs)
+        payload = pickle.dumps(basis_tree, protocol=pickle.HIGHEST_PROTOCOL)
+        node.base.repository.put_object_from_filelike(io.BytesIO(payload), "basis_tree.pkl")
+
         return node
 
     def load_basis_tree(self) -> BasisTree:
@@ -50,8 +56,16 @@ class BasisTreeData(Data):
         Returns:
             The Renormalizer BasisTree object.
         """
-        from renormalizer.tn.node import TreeNodeBasis
         from renormalizer.tn.treebase import BasisTree as RenoBasisTree
+
+        # Fast path: use compiled cache when present.
+        try:
+            with self.base.repository.open("basis_tree.pkl", "rb") as handle:
+                return pickle.loads(handle.read())
+        except FileNotFoundError:
+            pass
+
+        from renormalizer.tn.node import TreeNodeBasis
 
         tree_data = read_json_from_repository(self, "tree_structure.json")
 
@@ -75,6 +89,19 @@ class BasisTreeData(Data):
                 break
 
         return RenoBasisTree(root)
+
+    def write_cached_pickle(self, destination) -> bool:
+        """Write cached `basis_tree.pkl` bytes into an open binary destination.
+
+        Returns:
+            True if cache exists and was written, False otherwise.
+        """
+        try:
+            with self.base.repository.open("basis_tree.pkl", "rb") as src:
+                destination.write(src.read())
+            return True
+        except FileNotFoundError:
+            return False
 
 
 def _serialize_basis_tree(basis_tree: BasisTree) -> dict:

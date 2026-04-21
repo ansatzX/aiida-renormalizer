@@ -1,0 +1,113 @@
+"""Driver script for SbmSymbolicSpecFromModesCalcJob."""
+import json
+
+import numpy as np
+
+
+def save_output_parameters(params, output_file="output_parameters.json"):
+    with open(output_file, "w") as handle:
+        json.dump(params, handle, indent=2)
+
+
+def _suggest_sho_nbas(omega_k, c_j2, min_nbas, prefactor):
+    nbas = np.maximum(prefactor * c_j2 / np.maximum(omega_k, 1e-12) ** 3, min_nbas)
+    return np.round(nbas).astype(int)
+
+
+if __name__ == "__main__":
+    with open("input_sbm_symbolic_spec.json", "r") as handle:
+        p = json.load(handle)
+
+    try:
+        omega_k = np.asarray(np.load("input_omega_k.npy"), dtype=float)
+        c_j2 = np.asarray(np.load("input_c_j2.npy"), dtype=float)
+        delta_eff = float(p["delta_eff"])
+        epsilon = float(p["epsilon"])
+        tree_type = str(p["tree_type"])
+        m_max = int(p["m_max"])
+        symbol_map = {str(k): str(v) for k, v in dict(p.get("symbol_map", {})).items()}
+        min_nbas = float(p["min_nbas"])
+        prefactor = float(p["nbas_prefactor"])
+        vib_prefix = str(p["vib_prefix"])
+
+        if omega_k.ndim != 1 or c_j2.ndim != 1 or omega_k.shape != c_j2.shape:
+            raise ValueError("omega_k and c_j2 must be 1D arrays of identical shape")
+        if np.any(omega_k <= 0):
+            raise ValueError("omega_k values must be positive")
+        if np.any(c_j2 < 0):
+            raise ValueError("c_j2 values must be non-negative")
+        if tree_type not in {"binary", "linear"}:
+            raise ValueError("tree_type must be 'binary' or 'linear'")
+        if m_max <= 0:
+            raise ValueError("m_max must be > 0")
+
+        c = np.sqrt(c_j2)
+        nbas = _suggest_sho_nbas(omega_k, c_j2, min_nbas=min_nbas, prefactor=prefactor)
+
+        basis = [{"kind": "half_spin", "dof": "spin", "sigmaqn": [0, 0]}]
+        basis += [
+            {"kind": "sho", "dof": f"{vib_prefix}{idx}", "omega": float(w), "nbas": int(n)}
+            for idx, (w, n) in enumerate(zip(omega_k, nbas))
+        ]
+
+        hamiltonian = [
+            {"symbol": "sigma_z", "dofs": "spin", "factor": float(epsilon)},
+            {"symbol": "sigma_x", "dofs": "spin", "factor": float(delta_eff)},
+        ]
+        for idx, w in enumerate(omega_k):
+            dof = f"{vib_prefix}{idx}"
+            hamiltonian.extend(
+                [
+                    {"symbol": "p^2", "dofs": dof, "factor": 0.5},
+                    {"symbol": "x^2", "dofs": dof, "factor": 0.5 * float(w) ** 2},
+                    {"symbol": "sigma_z x", "dofs": ["spin", dof], "factor": 0.5 * float(c[idx])},
+                ]
+            )
+
+        if symbol_map:
+            for term in hamiltonian:
+                symbol = str(term["symbol"])
+                term["symbol"] = symbol_map.get(symbol, symbol)
+
+        metadata = {
+            "n_modes": int(len(omega_k)),
+            "delta_eff": float(delta_eff),
+            "epsilon": float(epsilon),
+            "omega_k": omega_k.tolist(),
+            "c_j2": c_j2.tolist(),
+            "symbol_map": symbol_map,
+            "vib_prefix": vib_prefix,
+            "min_nbas": min_nbas,
+            "nbas_prefactor": prefactor,
+            "tree_type": tree_type,
+            "m_max": m_max,
+        }
+        symbolic_inputs = {
+            "basis": basis,
+            "hamiltonian": hamiltonian,
+            "tree_type": tree_type,
+            "m_max": m_max,
+            "sbm_metadata": metadata,
+        }
+        save_output_parameters(
+            {
+                "calcjob_class": "SbmSymbolicSpecFromModesCalcJob",
+                "calc_type": "sbm_symbolic_spec_from_modes",
+                "converged": True,
+                "symbolic_inputs": symbolic_inputs,
+                "metadata": metadata,
+            }
+        )
+    except Exception as exc:
+        import traceback
+
+        save_output_parameters(
+            {
+                "calcjob_class": "SbmSymbolicSpecFromModesCalcJob",
+                "calc_type": "sbm_symbolic_spec_from_modes",
+                "converged": False,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+        raise

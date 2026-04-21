@@ -3,6 +3,7 @@
 Constructs an MPO from a symbolic operator (Op or OpSum).
 """
 import json
+
 import numpy as np
 from renormalizer.model import Model
 from renormalizer.mps import Mpo
@@ -34,7 +35,11 @@ def load_op(input_file='input_op.json'):
         data = json.load(f)
 
     from aiida_renormalizer.data.op import deserialize_opsum
-    return deserialize_opsum(data['op'])
+    if isinstance(data, dict) and 'op' in data:
+        payload = data['op']
+    else:
+        payload = data
+    return deserialize_opsum(payload)
 
 # ============================================================================
 # OUTPUT SERIALIZATION UTILITIES (from base template)
@@ -62,7 +67,10 @@ def save_mpo(mpo, output_file='output_mpo.npz', description=''):
 if __name__ == '__main__':
     # Load inputs
     model = load_model()
-    op = load_op('input_op.json')
+    try:
+        op = load_op('input_op.json')
+    except FileNotFoundError:
+        op = model.ham_terms
 
     # Build MPO from operator
     mpo = Mpo(model, op)

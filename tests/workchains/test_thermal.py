@@ -71,3 +71,20 @@ def test_inspect_thermal_state_extracts_thermodynamics():
     assert wc.ctx.thermal_mpdm is output_mps
     assert wc.ctx.partition_function == 2.0
     assert wc.ctx.thermal_params["extra"] == 1
+
+
+def test_run_initial_state_calcjob_submits():
+    wc = make_workchain(ThermalStateWorkChain)
+    wc.inputs = Namespace(
+        model=Mock(),
+        code=Mock(),
+        space=orm.Str("GS"),
+    )
+
+    ThermalStateWorkChain.run_initial_state_calcjob(wc)
+
+    assert wc.submit.called
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["code"] is wc.inputs.code
+    assert submit_kwargs["space"] == wc.inputs.space

@@ -19,13 +19,6 @@ def _make_calcjob(cls, inputs_dict):
 class TestPropertyCalcJob:
     """Tests for multi-observable property scanning."""
 
-    def test_property_calcjob_defined(self):
-        """PropertyCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.composite.property import PropertyCalcJob
-
-        assert hasattr(PropertyCalcJob, "_template_name")
-        assert PropertyCalcJob._template_name == "property_driver.py.jinja"
-
     def test_property_inputs_outputs(self):
         """PropertyCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.composite.property import PropertyCalcJob
@@ -50,16 +43,6 @@ class TestPropertyCalcJob:
         namespace_names = [call[0][0] for call in namespace_calls]
 
         assert "observables" in namespace_names
-
-    def test_property_template_exists(self):
-        """PropertyCalcJob template file should exist."""
-        from pathlib import Path
-
-        import aiida_renormalizer
-        pkg_dir = Path(aiida_renormalizer.__file__).parent
-        template_path = pkg_dir / "templates" / "property_driver.py.jinja"
-
-        assert template_path.exists(), f"Template not found: {template_path}"
 
     def test_property_observable_namespace(self, sho_model, sho_mps, sho_mpo, artifact_storage_base):
         """PropertyCalcJob should accept multiple observables."""

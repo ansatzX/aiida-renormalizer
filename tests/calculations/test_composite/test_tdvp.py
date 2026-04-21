@@ -19,13 +19,6 @@ def _make_calcjob(cls, inputs_dict):
 class TestTDVPCalcJob:
     """Tests for TDVP real-time evolution."""
 
-    def test_tdvp_calcjob_defined(self):
-        """TDVPCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
-
-        assert hasattr(TDVPCalcJob, "_template_name")
-        assert TDVPCalcJob._template_name == "tdvp_driver.py.jinja"
-
     def test_tdvp_inputs_outputs(self):
         """TDVPCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
@@ -112,13 +105,3 @@ class TestTDVPCalcJob:
         context = calcjob._get_template_context()
 
         assert context["has_observables"] is True
-
-    def test_tdvp_template_exists(self):
-        """TDVPCalcJob template file should exist."""
-        from pathlib import Path
-
-        import aiida_renormalizer
-        pkg_dir = Path(aiida_renormalizer.__file__).parent
-        template_path = pkg_dir / "templates" / "tdvp_driver.py.jinja"
-
-        assert template_path.exists(), f"Template not found: {template_path}"

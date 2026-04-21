@@ -1,0 +1,121 @@
+"""Driver script for BathSpinBosonModelCalcJob."""
+import json
+
+import numpy as np
+from renormalizer.sbm import param2mollist
+from renormalizer.utils import Quantity
+
+
+def save_output_parameters(params, output_file="output_parameters.json"):
+    with open(output_file, "w") as f:
+        json.dump(params, f, indent=2)
+
+
+def _as_float(value, default=None):
+    try:
+        return float(value)
+    except Exception:
+        if hasattr(value, "as_au"):
+            return float(value.as_au())
+        if isinstance(value, (list, tuple, np.ndarray)) and len(value) > 0:
+            return float(value[0])
+        if default is not None:
+            return float(default)
+        raise
+
+
+if __name__ == "__main__":
+    with open("input_bath_spin_boson_model.json", "r") as f:
+        p = json.load(f)
+
+    try:
+        construction = str(p["construction"])
+        epsilon = float(p["epsilon"])
+        dipole = p.get("dipole")
+        spectral_density_type = str(p.get("spectral_density_type", "ohmic_exp"))
+
+        if construction == "param2mollist":
+            alpha = float(p["alpha"])
+            raw_delta = float(p["raw_delta"])
+            omega_c = float(p["omega_c"])
+            renorm_p = float(p["renormalization_p"])
+            n_phonons = int(p["n_phonons"])
+
+            if raw_delta <= 0:
+                raise ValueError("raw_delta must be > 0")
+            if omega_c <= 0:
+                raise ValueError("omega_c must be > 0")
+            if renorm_p <= 0:
+                raise ValueError("renormalization_p must be > 0")
+            if n_phonons <= 0:
+                raise ValueError("n_phonons must be > 0")
+
+            model = param2mollist(
+                alpha,
+                Quantity(raw_delta),
+                Quantity(omega_c),
+                renorm_p,
+                n_phonons,
+            )
+            ph_list = list(model.ph_list)
+            delta_eff = _as_float(getattr(model, "delta", raw_delta), default=raw_delta)
+            source = {
+                "construction": "param2mollist",
+                "alpha": alpha,
+                "raw_delta": raw_delta,
+                "omega_c": omega_c,
+                "renormalization_p": renorm_p,
+                "n_phonons": n_phonons,
+                "spectral_density_type": spectral_density_type,
+            }
+        elif construction == "discrete":
+            omega_k = np.load("input_omega_k.npy")
+            c_j2 = np.load("input_c_j2.npy")
+            if omega_k.shape != c_j2.shape:
+                raise ValueError("omega_k and c_j2 must have identical shape")
+            if np.any(omega_k <= 0):
+                raise ValueError("omega_k must be positive")
+            delta_eff = float(p.get("delta_eff", 0.0))
+            source = {
+                "construction": "discrete",
+                "spectral_density_type": spectral_density_type,
+            }
+        else:
+            raise ValueError(f"Unsupported construction: {construction}")
+
+        if construction == "param2mollist":
+            omega_k = np.array([float(ph.omega[0]) for ph in ph_list], dtype=float)
+            displacement = np.array([float(ph.dis[1]) for ph in ph_list], dtype=float)
+            c_j2 = (displacement * omega_k ** 2) ** 2
+        else:
+            omega_k = np.asarray(omega_k, dtype=float)
+            c_j2 = np.asarray(c_j2, dtype=float)
+            displacement = np.sqrt(np.maximum(c_j2, 0.0)) / np.maximum(omega_k ** 2, 1e-15)
+
+        output = {
+            "calcjob_class": "BathSpinBosonModelCalcJob",
+            "calc_type": "bath_spin_boson_model",
+            "epsilon": epsilon,
+            "delta_eff": float(delta_eff),
+            "dipole": dipole,
+            "omega_k": omega_k.tolist(),
+            "c_j2": c_j2.tolist(),
+            "displacement": displacement.tolist(),
+            "n_phonons": int(len(omega_k)),
+            "converged": True,
+            **source,
+        }
+        save_output_parameters(output)
+    except Exception as exc:
+        import traceback
+
+        save_output_parameters(
+            {
+                "calcjob_class": "BathSpinBosonModelCalcJob",
+                "calc_type": "bath_spin_boson_model",
+                "converged": False,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+        raise

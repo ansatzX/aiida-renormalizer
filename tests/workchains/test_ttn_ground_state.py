@@ -1,6 +1,5 @@
 """Unit tests for TTNGroundStateWorkChain."""
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
@@ -20,11 +19,14 @@ def test_ttn_ground_state_run_optimization():
     )
 
     # Run optimization -- self.submit is already mocked by make_workchain
-    result = TTNGroundStateWorkChain.run_optimization(wc)
+    TTNGroundStateWorkChain.run_optimization(wc)
 
     # Check that submit was called with OptimizeTTNSCalcJob
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["basis_tree"] is wc.inputs.basis_tree
+    assert submit_kwargs["ttno"] is wc.inputs.ttno
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_ttn_ground_state_inspect_success():

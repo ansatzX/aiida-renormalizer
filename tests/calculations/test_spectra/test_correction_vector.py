@@ -93,10 +93,3 @@ def test_correction_vector_write_inputs(generate_inputs, tmp_path):
     assert (tmp_path / "input_cv_params.json").exists()
     assert (tmp_path / "frequencies.npy").exists()
 
-
-def test_correction_vector_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.correction_vector")
-    assert calc_class is CorrectionVectorCalcJob

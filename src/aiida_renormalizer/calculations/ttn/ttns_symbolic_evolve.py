@@ -143,7 +143,6 @@ class TTNSSymbolicEvolveCalcJob(RenoBaseCalcJob):
         return [
             "output_parameters.json",
             "output_ttns.npz",
-            "output_basis_tree.npz",
             "trajectory.npz",
             "aiida.out",
             "aiida.err",

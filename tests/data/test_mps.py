@@ -127,13 +127,17 @@ class TestMPSData:
     def test_model_data_link(self, aiida_profile, sho_model, sho_mps, tmp_path):
         from aiida_renormalizer.data.model import ModelData
         from aiida_renormalizer.data.mps import MPSData
+        from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
+        layout_node = TensorNetworkLayoutData.from_chain([str(dof) for dof in sho_model.dofs])
+        layout_node.store()
 
         mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
+            layout_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "artifacts"),
             relative_path="states/linked.npz",
@@ -142,3 +146,5 @@ class TestMPSData:
 
         retrieved_model_node = mps_node.model_data
         assert retrieved_model_node.uuid == model_node.uuid
+        assert mps_node.tn_layout_data is not None
+        assert mps_node.tn_layout_data.uuid == layout_node.uuid

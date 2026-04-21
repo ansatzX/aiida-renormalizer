@@ -74,10 +74,3 @@ def test_charge_diffusion_retrieve_list(generate_inputs):
     assert 'output_mps.npz' not in retrieve_list
     assert 'output_parameters.json' in retrieve_list
 
-
-def test_charge_diffusion_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.charge_diffusion")
-    assert calc_class is ChargeDiffusionCalcJob

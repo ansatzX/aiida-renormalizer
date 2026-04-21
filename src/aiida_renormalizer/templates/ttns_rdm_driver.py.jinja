@@ -3,7 +3,9 @@
 Compute reduced density matrix for specific nodes.
 """
 import json
+import pickle
 import numpy as np
+from pathlib import Path
 from renormalizer.tn.treebase import BasisTree
 from renormalizer.tn.tree import TTNS
 
@@ -11,9 +13,13 @@ from renormalizer.tn.tree import TTNS
 # INPUT LOADING UTILITIES (from base template)
 # ============================================================================
 
-def load_basis_tree(input_file='input_basis_tree.npz'):
-    """Load a BasisTree from .npz file."""
-    return BasisTree.load(input_file)
+def load_basis_tree(input_file='input_basis_tree.pkl'):
+    """Load a BasisTree from cache pickle, fallback to legacy .npz."""
+    path = Path(input_file)
+    if path.exists():
+        with path.open('rb') as f:
+            return pickle.load(f)
+    return BasisTree.load('input_basis_tree.npz')
 
 def load_ttns(input_file='initial_ttns.npz', basis_tree=None):
     """Load a TTNS from .npz file."""

@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import ToContext, WorkChain
 
 from aiida_renormalizer.calculations.basic.build_mpo import BuildMPOCalcJob
-from aiida_renormalizer.data import ModelData, MPOData
+from aiida_renormalizer.data import ModelData, MPOData, TensorNetworkLayoutData
 
 
 class ModelToMPOWorkChain(WorkChain):
@@ -17,8 +17,10 @@ class ModelToMPOWorkChain(WorkChain):
 
         spec.input("model", valid_type=ModelData)
         spec.input("code", valid_type=orm.AbstractCode)
+        spec.input("tn_layout", valid_type=TensorNetworkLayoutData, required=False)
 
         spec.output("mpo", valid_type=MPOData)
+        spec.output("output_tn_layout", valid_type=TensorNetworkLayoutData, required=False)
         spec.output("output_parameters", valid_type=orm.Dict)
 
         spec.exit_code(570, "ERROR_BUILD_MPO_FAILED", message="MPO build failed")
@@ -26,21 +28,12 @@ class ModelToMPOWorkChain(WorkChain):
         spec.outline(cls.run_build, cls.inspect_build, cls.finalize)
 
     def run_build(self):
-        from renormalizer.model.op import OpSum
-
-        from aiida_renormalizer.data.op import OpData
-
-        model = self.inputs.model.load_model()
-        ham = model.ham_terms
-        if not isinstance(ham, OpSum):
-            ham = OpSum(list(ham))
-        op_data = OpData.from_opsum(ham)
-
         inputs = {
             "model": self.inputs.model,
             "code": self.inputs.code,
-            "op": op_data,
         }
+        if "tn_layout" in self.inputs:
+            inputs["tn_layout"] = self.inputs.tn_layout
         return ToContext(calc=self.submit(BuildMPOCalcJob, **inputs))
 
     def inspect_build(self):
@@ -51,8 +44,16 @@ class ModelToMPOWorkChain(WorkChain):
 
     def finalize(self):
         calc = self.ctx.calc
-        self.out("mpo", calc.outputs.output_mpo)
-        self.out(
-            "output_parameters",
-            orm.Dict(dict={"calc_pk": calc.pk, "process_label": "BuildMPOCalcJob"}),
-        )
+        mpo = calc.outputs.output_mpo
+        if not mpo.is_stored:
+            mpo.store()
+        self.out("mpo", mpo)
+        if "output_tn_layout" in calc.outputs:
+            self.out("output_tn_layout", calc.outputs.output_tn_layout)
+        elif "tn_layout" in self.inputs:
+            self.out("output_tn_layout", self.inputs.tn_layout)
+
+        params = orm.Dict(dict={"calc_pk": calc.pk, "process_label": "BuildMPOCalcJob"})
+        if not params.is_stored:
+            params.store()
+        self.out("output_parameters", params)

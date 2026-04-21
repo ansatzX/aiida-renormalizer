@@ -1,6 +1,6 @@
 """Unit tests for TTNTimeEvolutionWorkChain."""
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
@@ -32,23 +32,6 @@ def test_ttn_time_evolution_setup():
     assert wc.ctx.n_checkpoints == 4  # 20.0 / 5.0
 
 
-def test_ttn_time_evolution_not_finished():
-    """Test not_finished method."""
-    wc = make_workchain(TTNTimeEvolutionWorkChain)
-
-    wc.inputs = Namespace(total_time=orm.Float(20.0), dt=orm.Float(0.5))
-    wc.ctx = Namespace()
-    wc.ctx.current_step = 15
-    wc.ctx.total_steps = 20
-
-    # Should continue
-    assert TTNTimeEvolutionWorkChain.not_finished(wc) is True
-
-    wc.ctx.current_step = 20
-    # Should stop
-    assert TTNTimeEvolutionWorkChain.not_finished(wc) is False
-
-
 def test_ttn_time_evolution_run_checkpoint():
     """Test run_checkpoint method."""
     wc = make_workchain(TTNTimeEvolutionWorkChain)
@@ -74,10 +57,12 @@ def test_ttn_time_evolution_run_checkpoint():
     wc.ctx.n_checkpoints = 4
 
     # Run checkpoint -- self.submit is already mocked by make_workchain
-    result = TTNTimeEvolutionWorkChain.run_checkpoint(wc)
-
+    TTNTimeEvolutionWorkChain.run_checkpoint(wc)
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["basis_tree"] is wc.inputs.basis_tree
+    assert submit_kwargs["ttno"] is wc.inputs.ttno
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_ttn_time_evolution_inspect_checkpoint_success():

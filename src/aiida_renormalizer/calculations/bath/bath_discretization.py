@@ -37,8 +37,8 @@ class BathDiscretizationCalcJob(RenoBaseCalcJob):
         spec.input(
             "method",
             valid_type=orm.Str,
-            default=lambda: orm.Str("trapz"),
-            help="Discretization method: trapz | wang1_like | equal_area",
+            default=lambda: orm.Str("wang1"),
+            help="Discretization method: wang1",
         )
 
         spec.output(
@@ -84,4 +84,3 @@ class BathDiscretizationCalcJob(RenoBaseCalcJob):
         if "output_mps.npz" in retrieve_list:
             retrieve_list.remove("output_mps.npz")
         return retrieve_list
-

@@ -8,6 +8,7 @@ __all__ = [
     "MPOData",
     "MPSData",
     "OpData",
+    "TensorNetworkLayoutData",
     "TTNOData",
     "TTNSData",
 ]
@@ -43,6 +44,10 @@ def __getattr__(name: str):
         from aiida_renormalizer.data.op import OpData
 
         return OpData
+    if name == "TensorNetworkLayoutData":
+        from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
+
+        return TensorNetworkLayoutData
     if name == "TTNOData":
         from aiida_renormalizer.data.ttno import TTNOData
 

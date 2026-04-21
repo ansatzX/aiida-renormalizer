@@ -1,11 +1,10 @@
 """WorkChain for finite-temperature state preparation."""
 from __future__ import annotations
 
-import tempfile
-
 from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
+from aiida_renormalizer.calculations.basic.max_entangled_mpdm import MaxEntangledMpdmCalcJob
 from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
 from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
@@ -102,11 +101,17 @@ class ThermalStateWorkChain(WorkChain):
             "ERROR_INVALID_THERMAL_STATE",
             message="Thermal state validation failed (negative partition function, etc.)",
         )
+        spec.exit_code(
+            353,
+            "ERROR_INITIAL_STATE_FAILED",
+            message="Initial max-entangled state construction failed",
+        )
 
         # Outline
         spec.outline(
             cls.setup,
-            cls.construct_initial_state,
+            cls.run_initial_state_calcjob,
+            cls.inspect_initial_state_calcjob,
             cls.run_thermal_prop,
             cls.inspect_thermal_state,
             cls.return_thermal_state,
@@ -145,47 +150,24 @@ class ThermalStateWorkChain(WorkChain):
 
         self.report(f"Target: beta={self.ctx.beta}, temperature={self.ctx.temperature}")
 
-    def construct_initial_state(self):
-        """Construct identity/maximally-entangled initial MpDm.
-
-        For finite temperature calculations, the initial state is the
-        maximally-entangled state (infinite temperature density matrix).
-        """
-        self.report("Constructing maximally-entangled initial state")
-
-        # Load model
-        model = self.inputs.model.load_model()
-
-        # Construct maximally entangled state
-        # This is the infinite-temperature density matrix
-        # In renormalizer: MpDm.max_entangled_gs(model) or MpDm.max_entangled_ex(model)
-        from renormalizer.mps import MpDm
-
-        space = self.inputs.space.value
-        if space == "GS":
-            init_mpdm = MpDm.max_entangled_gs(model)
-        elif space == "EX":
-            init_mpdm = MpDm.max_entangled_ex(model)
-        else:
-            self.report(f"WARNING: Unknown space '{space}', using GS")
-            init_mpdm = MpDm.max_entangled_gs(model)
-
-        # Store as MPSData
-        artifact_base = self.inputs.metadata.options.get(
-            "artifact_storage_base",
-            str(tempfile.gettempdir()),
+    def run_initial_state_calcjob(self):
+        """Construct initial max-entangled MpDm as a dedicated CalcJob."""
+        self.report("Constructing maximally-entangled initial state via CalcJob")
+        return ToContext(
+            initial_state_calc=self.submit(
+                MaxEntangledMpdmCalcJob,
+                model=self.inputs.model,
+                code=self.inputs.code,
+                space=self.inputs.space,
+            )
         )
-        init_mpdm_node = MPSData.from_mps(
-            init_mpdm,
-            self.inputs.model,
-            storage_backend=self.inputs.metadata.options.get("artifact_storage_backend", "posix"),
-            storage_base=artifact_base,
-            relative_path=f"thermal/{self.node.uuid}/initial_mpdm.npz",
-        )
-        init_mpdm_node.store()
 
-        self.ctx.initial_mpdm = init_mpdm_node
-        self.report("Initial thermal state constructed and stored")
+    def inspect_initial_state_calcjob(self):
+        calc = self.ctx.initial_state_calc
+        if not calc.is_finished_ok:
+            self.report(f"MaxEntangledMpdmCalcJob failed: exit_status={calc.exit_status}")
+            return self.exit_codes.ERROR_INITIAL_STATE_FAILED
+        self.ctx.initial_mpdm = calc.outputs.output_mps
 
     def run_thermal_prop(self):
         """Run ThermalPropCalcJob to propagate to target temperature."""

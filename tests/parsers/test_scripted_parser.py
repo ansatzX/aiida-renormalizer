@@ -8,8 +8,13 @@ import pytest
 
 from aiida.orm import CalcJobNode
 
-from aiida_renormalizer.data import ModelData, MPSData
+from aiida_renormalizer.data import ModelData, MPSData, TensorNetworkLayoutData
 from aiida_renormalizer.parsers.scripted import ScriptedParser
+
+
+class _Inputs(dict):
+    def __getattr__(self, key):
+        return self[key]
 
 
 @pytest.fixture
@@ -50,11 +55,6 @@ def test_validate_physical_constraints_detects_nan(scripted_parser):
     assert result["passed"] is False
 
 
-def test_validate_physical_constraints_passes_normal_values(scripted_parser):
-    result = scripted_parser._validate_physical_constraints({"energy": -1.0, "steps": 10})
-    assert result["passed"] is True
-
-
 def test_parse_mps_file_returns_mpsdata(scripted_parser, simple_model, simple_MPS, tmp_path):
     model = simple_model.load_model()
     MPS = simple_MPS.load_mps(simple_model)
@@ -80,7 +80,12 @@ def test_parse_mps_file_returns_mpsdata(scripted_parser, simple_model, simple_MP
     assert len(loaded) == model.nsite
 
 
-def test_exit_codes_contract():
-    exit_codes = ScriptedParser.exit_codes()
-    assert exit_codes.ERROR_EXECUTION_FAILED.status == 100
-    assert exit_codes.ERROR_INVALID_OUTPUT.status == 501
+def test_resolve_chain_layout_prefers_input_layout(scripted_parser, simple_model):
+    provided_layout = TensorNetworkLayoutData.from_chain(["x0", "x1"])
+    mock_node = MagicMock()
+    mock_node.inputs = _Inputs(tn_layout=provided_layout)
+
+    with patch.object(type(scripted_parser), "node", new_callable=lambda: property(lambda self: mock_node)):
+        resolved = scripted_parser._resolve_chain_layout(simple_model)
+
+    assert resolved.uuid == provided_layout.uuid

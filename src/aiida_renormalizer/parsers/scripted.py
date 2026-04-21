@@ -11,7 +11,7 @@ from aiida import orm
 from aiida.engine import ExitCode
 from aiida.parsers import Parser
 
-from aiida_renormalizer.data import ModelData, MPSData, MPOData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, TensorNetworkLayoutData
 
 
 class ScriptedParser(Parser):
@@ -46,6 +46,7 @@ class ScriptedParser(Parser):
             return self.exit_codes.ERROR_OUTPUT_MISSING
 
         # 3. Parse output_mps.npz (if present)
+        chain_layout_data = None
         if 'output_mps.npz' in self.retrieved.list_object_names():
             try:
                 # Model is required to parse MPS
@@ -54,7 +55,8 @@ class ScriptedParser(Parser):
                     return self.exit_codes.ERROR_INVALID_OUTPUT
 
                 model_data = self.inputs.model
-                mps_data = self._parse_mps_file('output_mps.npz', model_data)
+                chain_layout_data = self._resolve_chain_layout(model_data)
+                mps_data = self._parse_mps_file('output_mps.npz', model_data, chain_layout_data)
                 self.out('output_mps', mps_data)
             except Exception as e:
                 self.logger.error(f"Failed to parse output_mps.npz: {e}")
@@ -69,7 +71,9 @@ class ScriptedParser(Parser):
                     return self.exit_codes.ERROR_INVALID_OUTPUT
 
                 model_data = self.inputs.model
-                mpo_data = self._parse_mpo_file('output_mpo.npz', model_data)
+                if chain_layout_data is None:
+                    chain_layout_data = self._resolve_chain_layout(model_data)
+                mpo_data = self._parse_mpo_file('output_mpo.npz', model_data, chain_layout_data)
                 self.out('output_mpo', mpo_data)
             except Exception as e:
                 self.logger.error(f"Failed to parse output_mpo.npz: {e}")
@@ -86,6 +90,13 @@ class ScriptedParser(Parser):
                 self.logger.error(f"Failed to parse output_data.json: {e}")
                 return self.exit_codes.ERROR_OUTPUT_PARSING
 
+        if chain_layout_data is not None:
+            try:
+                if "output_tn_layout" in self.node.process_class.spec().outputs:
+                    self.out("output_tn_layout", chain_layout_data)
+            except Exception:
+                pass
+
         # 6. Physical validation
         validation_result = self._validate_physical_constraints(params)
         if not validation_result['passed']:
@@ -99,7 +110,12 @@ class ScriptedParser(Parser):
 
         return ExitCode()
 
-    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MPSData:
+    def _parse_mps_file(
+        self,
+        filename: str,
+        model_data: ModelData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
+    ) -> MPSData:
         """Parse an MPS .npz file into MPSData node."""
         with self.retrieved.open(filename, 'rb') as f:
             with tempfile.NamedTemporaryFile(suffix='.npz', delete=False) as tmp:
@@ -124,6 +140,7 @@ class ScriptedParser(Parser):
             mps_data = MPSData.from_mps(
                 MPS,
                 model_data,
+                tn_layout_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
                 relative_path=relative_path,
@@ -133,7 +150,12 @@ class ScriptedParser(Parser):
             import os
             os.unlink(tmp_path)
 
-    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MPOData:
+    def _parse_mpo_file(
+        self,
+        filename: str,
+        model_data: ModelData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
+    ) -> MPOData:
         """Parse an MPO .npz file into MPOData node."""
         import tempfile
 
@@ -151,6 +173,7 @@ class ScriptedParser(Parser):
             mpo_data = MPOData.from_mpo(
                 mpo,
                 model_data,
+                tn_layout_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
                 relative_path=relative_path,
@@ -170,6 +193,16 @@ class ScriptedParser(Parser):
             f"parsed/{getattr(self.node, 'uuid', 'unstored')}/{filename}"
         )
         return storage_backend, storage_base, relative_path
+
+    def _resolve_chain_layout(self, model_data: ModelData) -> TensorNetworkLayoutData:
+        """Reuse provided chain layout, otherwise create from model dof order."""
+        if "tn_layout" in self.node.inputs:
+            return self.node.inputs.tn_layout
+        dof_order = model_data.base.attributes.get("dof_list") or []
+        if not dof_order:
+            model = model_data.load_model()
+            dof_order = [str(dof) for dof in model.dofs]
+        return TensorNetworkLayoutData.from_chain([str(dof) for dof in dof_order])
 
     def _validate_physical_constraints(self, params: dict) -> dict:
         """Validate physical constraints.

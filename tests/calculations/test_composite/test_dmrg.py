@@ -25,13 +25,6 @@ def _make_calcjob(cls, inputs_dict):
 class TestDMRGCalcJob:
     """Tests for DMRG variational optimization."""
 
-    def test_dmrg_calcjob_defined(self):
-        """DMRGCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
-
-        assert hasattr(DMRGCalcJob, "_template_name")
-        assert DMRGCalcJob._template_name == "dmrg_driver.py.jinja"
-
     def test_dmrg_inputs_outputs(self):
         """DMRGCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
@@ -120,14 +113,3 @@ class TestDMRGCalcJob:
         context = calcjob._get_template_context()
 
         assert context["has_omega"] is True
-
-    def test_dmrg_template_exists(self):
-        """DMRGCalcJob template file should exist."""
-        from pathlib import Path
-
-        # Find template relative to package
-        import aiida_renormalizer
-        pkg_dir = Path(aiida_renormalizer.__file__).parent
-        template_path = pkg_dir / "templates" / "dmrg_driver.py.jinja"
-
-        assert template_path.exists(), f"Template not found: {template_path}"

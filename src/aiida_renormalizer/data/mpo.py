@@ -10,6 +10,7 @@ if t.TYPE_CHECKING:
     from renormalizer.mps import Mpo
 
     from aiida_renormalizer.data.model import ModelData
+    from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
 
 from aiida_renormalizer.data.artifacts import (
     build_artifact_manifest,
@@ -27,6 +28,7 @@ class MPOData(Data):
         cls,
         mpo: Mpo,
         model_data: ModelData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
         *,
         storage_backend: str = "posix",
         storage_base: str | None = None,
@@ -43,6 +45,8 @@ class MPOData(Data):
         node.base.attributes.set("bond_dims", [int(d) for d in mpo.bond_dims])
         node.base.attributes.set("dtype", str(mpo.dtype))
         node.base.attributes.set("model_data_uuid", str(model_data.uuid))
+        if tn_layout_data is not None:
+            node.base.attributes.set("tn_layout_data_uuid", str(tn_layout_data.uuid))
 
         artifact = write_external_artifact(
             mpo,
@@ -70,6 +74,14 @@ class MPOData(Data):
     def model_data(self) -> ModelData:
         """Retrieve the linked ModelData node."""
         return get_linked_node(self.base.attributes.get("model_data_uuid"))
+
+    @property
+    def tn_layout_data(self) -> TensorNetworkLayoutData | None:
+        """Retrieve the linked TensorNetworkLayoutData node, if present."""
+        uuid = self.base.attributes.get("tn_layout_data_uuid")
+        if not uuid:
+            return None
+        return get_linked_node(uuid)
 
     @property
     def artifact_metadata(self) -> dict[str, t.Any]:

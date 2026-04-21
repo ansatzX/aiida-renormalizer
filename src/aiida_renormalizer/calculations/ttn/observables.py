@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 import tempfile
 from typing import List
 
@@ -10,6 +11,18 @@ from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
 from aiida_renormalizer.data import BasisTreeData, TTNSData, TTNOData
+
+
+def _write_basis_tree_pickle_input(folder, basis_tree_data: BasisTreeData) -> None:
+    """Write `input_basis_tree.pkl` reusing BasisTreeData cache when possible."""
+    with folder.open("input_basis_tree.pkl", "wb") as dst:
+        if not basis_tree_data.write_cached_pickle(dst):
+            dst.write(
+                pickle.dumps(
+                    basis_tree_data.load_basis_tree(),
+                    protocol=pickle.HIGHEST_PROTOCOL,
+                )
+            )
 
 
 class TTNSExpectationCalcJob(RenoBaseCalcJob):
@@ -47,15 +60,7 @@ class TTNSExpectationCalcJob(RenoBaseCalcJob):
 
         # Write basis tree
         basis_tree_data = self.inputs.basis_tree
-        basis_tree = basis_tree_data.load_basis_tree()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            basis_tree_path = os.path.join(tmpdir, "basis_tree")
-            basis_tree.dump(basis_tree_path)
-            actual = basis_tree_path + ".npz" if os.path.exists(basis_tree_path + ".npz") else basis_tree_path
-            with open(actual, "rb") as src:
-                with folder.open("input_basis_tree.npz", "wb") as dst:
-                    dst.write(src.read())
+        _write_basis_tree_pickle_input(folder, basis_tree_data)
 
         # Write TTNS
         ttns_data = self.inputs.ttns
@@ -123,15 +128,7 @@ class TTNSEntropyCalcJob(RenoBaseCalcJob):
 
         # Write basis tree
         basis_tree_data = self.inputs.basis_tree
-        basis_tree = basis_tree_data.load_basis_tree()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            basis_tree_path = os.path.join(tmpdir, "basis_tree")
-            basis_tree.dump(basis_tree_path)
-            actual = basis_tree_path + ".npz" if os.path.exists(basis_tree_path + ".npz") else basis_tree_path
-            with open(actual, "rb") as src:
-                with folder.open("input_basis_tree.npz", "wb") as dst:
-                    dst.write(src.read())
+        _write_basis_tree_pickle_input(folder, basis_tree_data)
 
         # Write TTNS
         ttns_data = self.inputs.ttns
@@ -187,15 +184,7 @@ class TTNSMutualInfoCalcJob(RenoBaseCalcJob):
 
         # Write basis tree
         basis_tree_data = self.inputs.basis_tree
-        basis_tree = basis_tree_data.load_basis_tree()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            basis_tree_path = os.path.join(tmpdir, "basis_tree")
-            basis_tree.dump(basis_tree_path)
-            actual = basis_tree_path + ".npz" if os.path.exists(basis_tree_path + ".npz") else basis_tree_path
-            with open(actual, "rb") as src:
-                with folder.open("input_basis_tree.npz", "wb") as dst:
-                    dst.write(src.read())
+        _write_basis_tree_pickle_input(folder, basis_tree_data)
 
         # Write TTNS
         ttns_data = self.inputs.ttns
@@ -265,15 +254,7 @@ class TTNSRdmCalcJob(RenoBaseCalcJob):
 
         # Write basis tree
         basis_tree_data = self.inputs.basis_tree
-        basis_tree = basis_tree_data.load_basis_tree()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            basis_tree_path = os.path.join(tmpdir, "basis_tree")
-            basis_tree.dump(basis_tree_path)
-            actual = basis_tree_path + ".npz" if os.path.exists(basis_tree_path + ".npz") else basis_tree_path
-            with open(actual, "rb") as src:
-                with folder.open("input_basis_tree.npz", "wb") as dst:
-                    dst.write(src.read())
+        _write_basis_tree_pickle_input(folder, basis_tree_data)
 
         # Write TTNS
         ttns_data = self.inputs.ttns

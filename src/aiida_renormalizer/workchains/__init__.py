@@ -1,6 +1,7 @@
 """WorkChains for aiida-renormalizer."""
 from .absorption import AbsorptionWorkChain
 from .bath_mpo_pipeline import BathMPOPipelineWorkChain
+from .ohmic_renorm_modes import OhmicRenormModesWorkChain
 from .bath_spin_boson_model import BathSpinBosonModelWorkChain
 from .charge_diffusion import ChargeDiffusionWorkChain
 from .convergence import ConvergenceWorkChain
@@ -12,7 +13,6 @@ from .mpo_to_initial_mps import MPOToInitialMPSWorkChain
 from .mps_dynamics import MPSDynamicsWorkChain
 from .restart import RenoRestartWorkChain
 from .sbm_model_from_modes import SbmModelFromModesWorkChain
-from .sbm_spectral_modes import SbmSpectralModesWorkChain
 from .spin_boson import SpinBosonWorkChain
 from .sweep import (
     BondDimensionSweepWorkChain,
@@ -30,11 +30,46 @@ from .ttn_symbolic_model import TTNSymbolicModelWorkChain
 from .ttn_time_evolution import TTNTimeEvolutionWorkChain
 from .vibronic import VibronicWorkChain
 
+ACTIVE_WORKCHAINS = [
+    "RenoRestartWorkChain",
+    "TimeEvolutionWorkChain",
+    "GroundStateWorkChain",
+    "AbsorptionWorkChain",
+    "ConvergenceWorkChain",
+    "ThermalStateWorkChain",
+    "KuboTransportWorkChain",
+    "CustomPipelineWorkChain",
+    "ParameterSweepWorkChain",
+    "TemperatureSweepWorkChain",
+    "BondDimensionSweepWorkChain",
+    "FrequencySweepWorkChain",
+    "CorrectionVectorWorkChain",
+    "ChargeDiffusionWorkChain",
+    "BathMPOPipelineWorkChain",
+    "BathSpinBosonModelWorkChain",
+    "OhmicRenormModesWorkChain",
+    "SbmModelFromModesWorkChain",
+    "ModelToMPOWorkChain",
+    "MPOToInitialMPSWorkChain",
+    "MPSDynamicsWorkChain",
+    "SpinBosonWorkChain",
+    "VibronicWorkChain",
+    "TTNGroundStateWorkChain",
+    "TTNTimeEvolutionWorkChain",
+    "TTNMPSComparisonWorkChain",
+    "TTNSymbolicModelWorkChain",
+    "TTNSymbolicDynamicsWorkChain",
+]
+
+WORKCHAIN_PROCESS_STATUS = {
+    **{name: "active" for name in ACTIVE_WORKCHAINS},
+}
+
 __all__ = [
     "RenoRestartWorkChain",
     "TimeEvolutionWorkChain",
     "GroundStateWorkChain",
-    "SbmSpectralModesWorkChain",
+    "OhmicRenormModesWorkChain",
     "SbmModelFromModesWorkChain",
     "ModelToMPOWorkChain",
     "MPOToInitialMPSWorkChain",
@@ -59,4 +94,6 @@ __all__ = [
     "TTNMPSComparisonWorkChain",
     "TTNSymbolicModelWorkChain",
     "TTNSymbolicDynamicsWorkChain",
+    "ACTIVE_WORKCHAINS",
+    "WORKCHAIN_PROCESS_STATUS",
 ]

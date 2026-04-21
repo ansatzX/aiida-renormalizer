@@ -53,8 +53,8 @@ class BathMPOPipelineWorkChain(WorkChain):
         spec.input(
             "discretization_method",
             valid_type=orm.Str,
-            default=lambda: orm.Str("trapz"),
-            help="trapz | wang1_like | equal_area",
+            default=lambda: orm.Str("wang1"),
+            help="wang1",
         )
 
         spec.input("frequency_scale", valid_type=orm.Float, default=lambda: orm.Float(1.0))
@@ -96,6 +96,9 @@ class BathMPOPipelineWorkChain(WorkChain):
             return self.exit_codes.ERROR_INPUT_VALIDATION
         if has_continuous and has_discrete:
             self.report("Both continuous and pre-discretized inputs were given")
+            return self.exit_codes.ERROR_INPUT_VALIDATION
+        if self.inputs.discretization_method.value != "wang1":
+            self.report("discretization_method must be 'wang1'")
             return self.exit_codes.ERROR_INPUT_VALIDATION
 
     def needs_spectral_density(self):

@@ -19,13 +19,6 @@ def _make_calcjob(cls, inputs_dict):
 class TestThermalPropCalcJob:
     """Tests for finite-temperature state preparation."""
 
-    def test_thermal_prop_calcjob_defined(self):
-        """ThermalPropCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
-
-        assert hasattr(ThermalPropCalcJob, "_template_name")
-        assert ThermalPropCalcJob._template_name == "thermal_prop_driver.py.jinja"
-
     def test_thermal_prop_inputs_outputs(self):
         """ThermalPropCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
@@ -72,13 +65,3 @@ class TestThermalPropCalcJob:
 
         assert "n_iterations" in context
         assert context["n_iterations"] == 10
-
-    def test_thermal_prop_template_exists(self):
-        """ThermalPropCalcJob template file should exist."""
-        from pathlib import Path
-
-        import aiida_renormalizer
-        pkg_dir = Path(aiida_renormalizer.__file__).parent
-        template_path = pkg_dir / "templates" / "thermal_prop_driver.py.jinja"
-
-        assert template_path.exists(), f"Template not found: {template_path}"

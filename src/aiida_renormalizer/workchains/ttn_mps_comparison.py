@@ -4,8 +4,8 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
-from aiida_renormalizer.workchains.ground_state import GroundStateWorkChain
-from aiida_renormalizer.workchains.ttn_ground_state import TTNGroundStateWorkChain
+from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
+from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
 from aiida_renormalizer.data import ModelData, MPSData, MPOData, BasisTreeData, TTNOData, TTNSData
 
 
@@ -126,22 +126,18 @@ class TTNMPSComparisonWorkChain(WorkChain):
         self.report(f"Running MPS {calc_type}")
 
         if calc_type == "ground_state":
-            # Build inputs for GroundStateWorkChain
+            # Build inputs for DMRGCalcJob
             inputs = {
                 "model": self.inputs.model,
                 "mpo": self.inputs.mpo,
-                "strategy": orm.Str("dmrg"),
                 "code": self.inputs.code,
             }
 
             if "initial_mps" in self.inputs:
                 inputs["initial_mps"] = self.inputs.initial_mps
 
-            if "config_mps" in self.inputs:
-                inputs["config"] = self.inputs.config_mps
-
             # Submit MPS ground state calculation
-            future = self.submit(GroundStateWorkChain, **inputs)
+            future = self.submit(DMRGCalcJob, **inputs)
             return ToContext(mps_calc=future)
 
         else:
@@ -161,7 +157,7 @@ class TTNMPSComparisonWorkChain(WorkChain):
                 return self.exit_codes.ERROR_MPS_FAILED
 
             # Store results
-            self.ctx.mps_result = calc.outputs.ground_state
+            self.ctx.mps_result = calc.outputs.output_mps
             self.ctx.mps_energy = None
 
             if "energy" in calc.outputs:
@@ -169,6 +165,10 @@ class TTNMPSComparisonWorkChain(WorkChain):
 
             if "output_parameters" in calc.outputs:
                 params = calc.outputs.output_parameters.get_dict()
+                if self.ctx.mps_energy is None:
+                    self.ctx.mps_energy = params.get("energy", params.get("e"))
+                    if self.ctx.mps_energy is None and isinstance(params.get("energies"), list) and params["energies"]:
+                        self.ctx.mps_energy = params["energies"][-1]
                 self.ctx.mps_params = params
 
             self.report(f"MPS calculation completed: energy={self.ctx.mps_energy}")
@@ -179,7 +179,7 @@ class TTNMPSComparisonWorkChain(WorkChain):
         self.report(f"Running TTN {calc_type}")
 
         if calc_type == "ground_state":
-            # Build inputs for TTNGroundStateWorkChain
+            # Build inputs for OptimizeTTNSCalcJob
             inputs = {
                 "basis_tree": self.inputs.basis_tree,
                 "ttno": self.inputs.ttno,
@@ -189,11 +189,8 @@ class TTNMPSComparisonWorkChain(WorkChain):
             if "initial_ttns" in self.inputs:
                 inputs["initial_ttns"] = self.inputs.initial_ttns
 
-            if "config_ttn" in self.inputs:
-                inputs["config"] = self.inputs.config_ttn
-
             # Submit TTN ground state calculation
-            future = self.submit(TTNGroundStateWorkChain, **inputs)
+            future = self.submit(OptimizeTTNSCalcJob, **inputs)
             return ToContext(ttn_calc=future)
 
         else:
@@ -213,7 +210,7 @@ class TTNMPSComparisonWorkChain(WorkChain):
                 return self.exit_codes.ERROR_TTN_FAILED
 
             # Store results
-            self.ctx.ttn_result = calc.outputs.ground_state
+            self.ctx.ttn_result = calc.outputs.output_ttns
             self.ctx.ttn_energy = None
 
             if "energy" in calc.outputs:
@@ -221,6 +218,10 @@ class TTNMPSComparisonWorkChain(WorkChain):
 
             if "output_parameters" in calc.outputs:
                 params = calc.outputs.output_parameters.get_dict()
+                if self.ctx.ttn_energy is None:
+                    self.ctx.ttn_energy = params.get("energy", params.get("e"))
+                    if self.ctx.ttn_energy is None and isinstance(params.get("energies"), list) and params["energies"]:
+                        self.ctx.ttn_energy = params["energies"][-1]
                 self.ctx.ttn_params = params
 
             self.report(f"TTN calculation completed: energy={self.ctx.ttn_energy}")

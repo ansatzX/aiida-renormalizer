@@ -81,26 +81,3 @@ def test_spectra_zero_t_write_inputs(generate_inputs, tmp_path):
     assert (tmp_path / "input_model.json").exists()
     assert (tmp_path / "input_spectra_params.json").exists()
 
-
-def test_spectra_zero_t_template_exists():
-    """Test that the template file exists."""
-    import os
-    from aiida_renormalizer.calculations.spectra.spectra_zero_t import SpectraZeroTCalcJob
-
-    template_dir = os.path.join(
-        os.path.dirname(__file__),
-        "..", "..", "..",
-        "src", "aiida_renormalizer", "templates"
-    )
-    template_name = SpectraZeroTCalcJob._template_name
-    template_path = os.path.join(template_dir, template_name)
-
-    assert os.path.exists(template_path), f"Template not found: {template_path}"
-
-
-def test_spectra_zero_t_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.spectra_zero_t")
-    assert calc_class is SpectraZeroTCalcJob

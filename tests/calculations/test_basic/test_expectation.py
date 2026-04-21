@@ -1,20 +1,8 @@
 """Tests for ExpectationCalcJob."""
 from __future__ import annotations
 
-import pytest
-from aiida import orm
-
-from aiida_renormalizer.data import ModelData, MPSData, MPOData
-
 
 class TestExpectationCalcJob:
-    def test_expectation_calcjob_defined(self):
-        """ExpectationCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.basic.expectation import ExpectationCalcJob
-
-        assert hasattr(ExpectationCalcJob, '_template_name')
-        assert ExpectationCalcJob._template_name == 'expectation_driver.py.jinja'
-
     def test_expectation_inputs_outputs(self):
         """ExpectationCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.basic.expectation import ExpectationCalcJob

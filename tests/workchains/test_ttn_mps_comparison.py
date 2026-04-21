@@ -1,6 +1,6 @@
 """Unit tests for TTNMPSComparisonWorkChain."""
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
@@ -48,10 +48,12 @@ def test_ttn_mps_comparison_run_mps():
     )
 
     # Run MPS -- self.submit is already mocked by make_workchain
-    result = TTNMPSComparisonWorkChain.run_mps(wc)
-
+    TTNMPSComparisonWorkChain.run_mps(wc)
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["mpo"] is wc.inputs.mpo
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_ttn_mps_comparison_inspect_mps_success():
@@ -68,7 +70,7 @@ def test_ttn_mps_comparison_inspect_mps_success():
     params.get_dict.return_value = {"iterations": 10, "M_max": 50}
 
     calc.outputs = Namespace(
-        ground_state=Mock(),
+        output_mps=Mock(),
         energy=energy_mock,
         output_parameters=params,
     )
@@ -83,7 +85,7 @@ def test_ttn_mps_comparison_inspect_mps_success():
 
     # Check results
     assert result is None  # No error
-    assert wc.ctx.mps_result == calc.outputs.ground_state
+    assert wc.ctx.mps_result == calc.outputs.output_mps
     assert wc.ctx.mps_energy == -1.5
 
 
@@ -119,10 +121,12 @@ def test_ttn_mps_comparison_run_ttn():
     )
 
     # Run TTN -- self.submit is already mocked by make_workchain
-    result = TTNMPSComparisonWorkChain.run_ttn(wc)
-
+    TTNMPSComparisonWorkChain.run_ttn(wc)
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["basis_tree"] is wc.inputs.basis_tree
+    assert submit_kwargs["ttno"] is wc.inputs.ttno
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_ttn_mps_comparison_inspect_ttn_success():
@@ -139,7 +143,7 @@ def test_ttn_mps_comparison_inspect_ttn_success():
     params.get_dict.return_value = {"iterations": 8, "bond_dims": [10, 15, 20]}
 
     calc.outputs = Namespace(
-        ground_state=Mock(),
+        output_ttns=Mock(),
         energy=energy_mock,
         output_parameters=params,
     )
@@ -154,7 +158,7 @@ def test_ttn_mps_comparison_inspect_ttn_success():
 
     # Check results
     assert result is None
-    assert wc.ctx.ttn_result == calc.outputs.ground_state
+    assert wc.ctx.ttn_result == calc.outputs.output_ttns
     assert wc.ctx.ttn_energy == -1.45
 
 

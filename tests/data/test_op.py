@@ -141,3 +141,30 @@ class TestOpData:
 
         restored = node.load_opsum()
         assert len(restored) == 2
+
+    def test_from_serialized_opsum_roundtrip(self, aiida_profile):
+        from aiida_renormalizer.data.op import OpData
+
+        serialized = [
+            {
+                "symbol": "b^\\dagger b",
+                "dofs": ["v0"],
+                "factor": {"real": 1.0, "imag": 0.0},
+                "qn": None,
+            },
+            {
+                "symbol": "b^\\dagger b",
+                "dofs": ["v1"],
+                "factor": {"real": 1.5, "imag": 0.0},
+                "qn": None,
+            },
+        ]
+        node = OpData.from_serialized_opsum(serialized)
+        node.store()
+
+        assert node.base.attributes.get("op_type") == "OpSum"
+        assert node.base.attributes.get("n_terms") == 2
+        assert node.base.attributes.get("dofs") == ["v0", "v1"]
+
+        restored = node.load_opsum()
+        assert len(restored) == 2

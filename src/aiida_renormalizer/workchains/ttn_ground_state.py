@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
 from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
-from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TTNOData
+from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TTNOData, TensorNetworkLayoutData
 
 
 class TTNGroundStateWorkChain(WorkChain):
@@ -53,10 +53,12 @@ class TTNGroundStateWorkChain(WorkChain):
             help="Energy convergence threshold",
         )
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
+        spec.input("tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
 
         # Outputs
         spec.output("ground_state", valid_type=TTNSData, help="Ground state TTNS")
         spec.output("energy", valid_type=orm.Float, help="Ground state energy")
+        spec.output("output_tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
         spec.output("output_parameters", valid_type=orm.Dict, help="Calculation statistics")
 
         # Exit codes
@@ -101,6 +103,8 @@ class TTNGroundStateWorkChain(WorkChain):
         # Add config if provided
         if "config" in self.inputs:
             inputs["config"] = self.inputs.config
+        if "tn_layout" in self.inputs:
+            inputs["tn_layout"] = self.inputs.tn_layout
 
         # Submit optimization calculation
         future = self.submit(OptimizeTTNSCalcJob, **inputs)
@@ -119,6 +123,10 @@ class TTNGroundStateWorkChain(WorkChain):
 
         # Store results in context
         self.ctx.ground_state = calc.outputs.output_ttns
+        if "output_tn_layout" in calc.outputs:
+            self.ctx.tn_layout = calc.outputs.output_tn_layout
+        elif "tn_layout" in self.inputs:
+            self.ctx.tn_layout = self.inputs.tn_layout
         self.ctx.energy = None
 
         # Extract energy from output parameters
@@ -143,6 +151,8 @@ class TTNGroundStateWorkChain(WorkChain):
         # Output energy
         if self.ctx.energy is not None:
             self.out("energy", orm.Float(self.ctx.energy))
+        if hasattr(self.ctx, "tn_layout"):
+            self.out("output_tn_layout", self.ctx.tn_layout)
 
         # Output statistics
         stats = {

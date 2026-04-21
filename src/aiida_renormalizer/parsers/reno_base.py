@@ -11,7 +11,14 @@ from aiida import orm
 from aiida.engine import ExitCode
 from aiida.parsers import Parser
 
-from aiida_renormalizer.data import BasisTreeData, ModelData, MPOData, MPSData, TTNSData
+from aiida_renormalizer.data import (
+    BasisTreeData,
+    ModelData,
+    MPOData,
+    MPSData,
+    TTNSData,
+    TensorNetworkLayoutData,
+)
 
 
 class RenoBaseParser(Parser):
@@ -44,14 +51,51 @@ class RenoBaseParser(Parser):
         except FileNotFoundError:
             return self.exit_codes.ERROR_OUTPUT_MISSING
 
+        # Parse output_model from symbolic payload (if process exposes this output)
+        try:
+            if "output_model" in self.node.process_class.spec().outputs:
+                symbolic_inputs = params.get("symbolic_inputs")
+                if isinstance(symbolic_inputs, dict):
+                    basis = symbolic_inputs.get("basis")
+                    hamiltonian = symbolic_inputs.get("hamiltonian")
+                    if isinstance(basis, list) and isinstance(hamiltonian, list) and basis and hamiltonian:
+                        dipole = symbolic_inputs.get("dipole")
+                        model_node = ModelData.from_symbolic_spec(
+                            basis=basis,
+                            hamiltonian=hamiltonian,
+                            dipole=dipole if isinstance(dipole, list) else None,
+                        )
+                        self.out("output_model", model_node)
+        except Exception as e:
+            self.logger.error(f"Failed to parse output_model from symbolic payload: {e}")
+            return self.exit_codes.ERROR_OUTPUT_PARSING
+
+        # Parse output_basis_tree from symbolic payload (if process exposes this output)
+        try:
+            if "output_basis_tree" in self.node.process_class.spec().outputs:
+                symbolic_inputs = params.get("symbolic_inputs")
+                if isinstance(symbolic_inputs, dict):
+                    basis_tree_data = self._basis_tree_from_symbolic_payload(symbolic_inputs)
+                    self.out("output_basis_tree", basis_tree_data)
+        except Exception as e:
+            self.logger.error(f"Failed to parse output_basis_tree from symbolic payload: {e}")
+            return self.exit_codes.ERROR_OUTPUT_PARSING
+
         # 3. Parse output_mps.npz (if present)
+        chain_layout_data = None
+        tree_layout_data = None
         if 'output_mps.npz' in self.retrieved.list_object_names():
             try:
                 if "model" not in self.node.inputs:
                     self.logger.error("Cannot parse output_mps.npz: model input required")
                     return self.exit_codes.ERROR_OUTPUT_PARSING
                 model_data = self.node.inputs.model
-                mps_data = self._parse_mps_file('output_mps.npz', model_data)
+                chain_layout_data = self._resolve_chain_layout(model_data)
+                mps_data = self._parse_mps_file(
+                    'output_mps.npz',
+                    model_data,
+                    chain_layout_data,
+                )
                 self.out('output_mps', mps_data)
             except Exception as e:
                 self.logger.error(f"Failed to parse output_mps.npz: {e}")
@@ -64,7 +108,13 @@ class RenoBaseParser(Parser):
                     self.logger.error("Cannot parse output_mpo.npz: model input required")
                     return self.exit_codes.ERROR_OUTPUT_PARSING
                 model_data = self.node.inputs.model
-                mpo_data = self._parse_mpo_file('output_mpo.npz', model_data)
+                if chain_layout_data is None:
+                    chain_layout_data = self._resolve_chain_layout(model_data)
+                mpo_data = self._parse_mpo_file(
+                    'output_mpo.npz',
+                    model_data,
+                    chain_layout_data,
+                )
                 self.out('output_mpo', mpo_data)
             except Exception as e:
                 self.logger.error(f"Failed to parse output_mpo.npz: {e}")
@@ -87,7 +137,12 @@ class RenoBaseParser(Parser):
                         "Cannot parse output_ttns.npz: basis_tree input or output_basis_tree.npz required"
                     )
                     return self.exit_codes.ERROR_OUTPUT_PARSING
-                ttns_data = self._parse_ttns_file('output_ttns.npz', basis_tree_data)
+                tree_layout_data = self._resolve_tree_layout(basis_tree_data)
+                ttns_data = self._parse_ttns_file(
+                    'output_ttns.npz',
+                    basis_tree_data,
+                    tree_layout_data,
+                )
                 self.out('output_ttns', ttns_data)
             except Exception as e:
                 self.logger.error(f"Failed to parse output_ttns.npz: {e}")
@@ -98,6 +153,16 @@ class RenoBaseParser(Parser):
             try:
                 if "output_basis_tree" in self.node.process_class.spec().outputs:
                     self.out("output_basis_tree", parsed_basis_tree_data)
+            except Exception:
+                pass
+
+        for layout_data in (tree_layout_data, chain_layout_data):
+            if layout_data is None:
+                continue
+            try:
+                if "output_tn_layout" in self.node.process_class.spec().outputs:
+                    self.out("output_tn_layout", layout_data)
+                break
             except Exception:
                 pass
 
@@ -113,7 +178,12 @@ class RenoBaseParser(Parser):
 
         return None
 
-    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MPSData:
+    def _parse_mps_file(
+        self,
+        filename: str,
+        model_data: ModelData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
+    ) -> MPSData:
         """Parse an MPS .npz file into MPSData node."""
         with self.retrieved.open(filename, 'rb') as f:
             with tempfile.NamedTemporaryFile(suffix='.npz', delete=False) as tmp:
@@ -135,6 +205,7 @@ class RenoBaseParser(Parser):
             mps_data = MPSData.from_mps(
                 MPS,
                 model_data,
+                tn_layout_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
                 relative_path=relative_path,
@@ -144,7 +215,12 @@ class RenoBaseParser(Parser):
             import os
             os.unlink(tmp_path)
 
-    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MPOData:
+    def _parse_mpo_file(
+        self,
+        filename: str,
+        model_data: ModelData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
+    ) -> MPOData:
         """Parse an MPO .npz file into MPOData node."""
         import tempfile
 
@@ -162,6 +238,7 @@ class RenoBaseParser(Parser):
             mpo_data = MPOData.from_mpo(
                 mpo,
                 model_data,
+                tn_layout_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
                 relative_path=relative_path,
@@ -171,7 +248,12 @@ class RenoBaseParser(Parser):
             import os
             os.unlink(tmp_path)
 
-    def _parse_ttns_file(self, filename: str, basis_tree_data: BasisTreeData) -> TTNSData:
+    def _parse_ttns_file(
+        self,
+        filename: str,
+        basis_tree_data: BasisTreeData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
+    ) -> TTNSData:
         """Parse a TTNS .npz file into TTNSData node."""
         with self.retrieved.open(filename, 'rb') as f:
             with tempfile.NamedTemporaryFile(suffix='.npz', delete=False) as tmp:
@@ -187,6 +269,7 @@ class RenoBaseParser(Parser):
             return TTNSData.from_ttns(
                 ttns_loaded,
                 basis_tree_data,
+                tn_layout_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
                 relative_path=relative_path,
@@ -215,6 +298,10 @@ class RenoBaseParser(Parser):
     def _basis_tree_from_symbolic_inputs(self) -> BasisTreeData:
         """Build BasisTreeData from symbolic TTNS inputs."""
         symbolic = self.node.inputs.symbolic_inputs.get_dict()
+        return self._basis_tree_from_symbolic_payload(symbolic)
+
+    def _basis_tree_from_symbolic_payload(self, symbolic: dict) -> BasisTreeData:
+        """Build BasisTreeData from symbolic payload dictionary."""
         basis_spec = symbolic["basis"]
 
         from renormalizer.model import basis as ba
@@ -240,6 +327,22 @@ class RenoBaseParser(Parser):
             raise ValueError(f"Unsupported tree_type in symbolic_inputs: {tree_type}")
 
         return BasisTreeData.from_basis_tree(basis_tree)
+
+    def _resolve_chain_layout(self, model_data: ModelData) -> TensorNetworkLayoutData:
+        """Reuse provided chain layout, otherwise create from model dof order."""
+        if "tn_layout" in self.node.inputs:
+            return self.node.inputs.tn_layout
+        dof_order = model_data.base.attributes.get("dof_list") or []
+        if not dof_order:
+            model = model_data.load_model()
+            dof_order = [str(dof) for dof in model.dofs]
+        return TensorNetworkLayoutData.from_chain([str(dof) for dof in dof_order])
+
+    def _resolve_tree_layout(self, basis_tree_data: BasisTreeData) -> TensorNetworkLayoutData:
+        """Reuse provided tree layout, otherwise derive from BasisTreeData."""
+        if "tn_layout" in self.node.inputs:
+            return self.node.inputs.tn_layout
+        return TensorNetworkLayoutData.from_basis_tree_data(basis_tree_data)
 
     def _get_artifact_location(self, filename: str) -> tuple[str, str, str]:
         """Return storage backend/base/path for parsed wavefunction artifacts."""

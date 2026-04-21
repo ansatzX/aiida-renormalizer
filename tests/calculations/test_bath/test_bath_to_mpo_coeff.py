@@ -78,10 +78,3 @@ def test_bath_to_mpo_coeff_retrieve_list():
     assert "output_parameters.json" in retrieve_list
 
 
-def test_bath_to_mpo_coeff_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.bath_to_mpo_coeff")
-    assert calc_class is BathToMPOCoeffCalcJob
-

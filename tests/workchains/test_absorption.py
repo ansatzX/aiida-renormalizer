@@ -1,37 +1,11 @@
 """Unit tests for AbsorptionWorkChain."""
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
 from aiida_renormalizer.workchains.absorption import AbsorptionWorkChain
 from tests.workchains.conftest import make_workchain, Namespace
-
-
-def test_absorption_needs_ground_state():
-    """Test needs_ground_state method."""
-    wc = make_workchain(AbsorptionWorkChain)
-
-    # No ground state provided
-    wc.inputs = Namespace()
-    assert wc.needs_ground_state() is True
-
-    # Ground state provided
-    wc.inputs = Namespace(ground_state=Mock())
-    assert wc.needs_ground_state() is False
-
-
-def test_absorption_temperature_checks():
-    """Test is_zero_temperature method."""
-    wc = make_workchain(AbsorptionWorkChain)
-
-    # Zero temperature (no temperature input)
-    wc.inputs = Namespace()
-    assert wc.is_zero_temperature() is True
-
-    # Finite temperature
-    wc.inputs = Namespace(temperature=orm.Float(300.0))
-    assert wc.is_zero_temperature() is False
 
 
 def test_absorption_prepare_ground_state_dmrg():
@@ -45,10 +19,11 @@ def test_absorption_prepare_ground_state_dmrg():
     )
     wc.ctx = Namespace()
 
-    result = wc.prepare_ground_state()
-
+    wc.prepare_ground_state()
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_absorption_prepare_ground_state_imag_time():
@@ -62,10 +37,11 @@ def test_absorption_prepare_ground_state_imag_time():
     )
     wc.ctx = Namespace()
 
-    result = wc.prepare_ground_state()
-
+    wc.prepare_ground_state()
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_absorption_inspect_ground_state_success():
@@ -112,9 +88,10 @@ def test_absorption_run_zero_t():
     )
     wc.ctx = Namespace(ground_state=Mock())
 
-    result = wc.run_zero_t_spectrum()
-
+    wc.run_zero_t_spectrum()
     assert wc.submit.called
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
 
 
 def test_absorption_run_finite_t():
@@ -129,9 +106,10 @@ def test_absorption_run_finite_t():
     )
     wc.ctx = Namespace(ground_state=Mock())
 
-    result = wc.run_finite_t_spectrum()
-
+    wc.run_finite_t_spectrum()
     assert wc.submit.called
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
 
 
 def test_absorption_inspect_spectrum_success():

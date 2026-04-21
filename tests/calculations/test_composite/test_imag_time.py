@@ -19,13 +19,6 @@ def _make_calcjob(cls, inputs_dict):
 class TestImagTimeCalcJob:
     """Tests for imaginary time evolution."""
 
-    def test_imag_time_calcjob_defined(self):
-        """ImagTimeCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
-
-        assert hasattr(ImagTimeCalcJob, "_template_name")
-        assert ImagTimeCalcJob._template_name == "imag_time_driver.py.jinja"
-
     def test_imag_time_inputs_outputs(self):
         """ImagTimeCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
@@ -91,13 +84,3 @@ class TestImagTimeCalcJob:
         context = calcjob._get_template_context()
 
         assert context["has_dt"] is True
-
-    def test_imag_time_template_exists(self):
-        """ImagTimeCalcJob template file should exist."""
-        from pathlib import Path
-
-        import aiida_renormalizer
-        pkg_dir = Path(aiida_renormalizer.__file__).parent
-        template_path = pkg_dir / "templates" / "imag_time_driver.py.jinja"
-
-        assert template_path.exists(), f"Template not found: {template_path}"

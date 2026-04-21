@@ -13,7 +13,6 @@ dependencies = [
     "renormalizer",
     "numpy<2.0",
     "jinja2>=3",  # Required for CalcJob driver template rendering
-    "click>=8",  # Required for CLI entry points
     "print-tree2",  # Required for TTN functionality
     "tomli>=2,<3",  # TOML parser (consistent dependency across Python versions)
 ]
@@ -33,6 +32,7 @@ dev = [
 "reno.basis"  = "aiida_renormalizer.data.basis:BasisSetData"
 "reno.config" = "aiida_renormalizer.data.config:ConfigData"
 "reno.basis_tree" = "aiida_renormalizer.data.basis_tree:BasisTreeData"
+"reno.tn_layout" = "aiida_renormalizer.data.tensor_network_layout:TensorNetworkLayoutData"
 "reno.ttns"   = "aiida_renormalizer.data.ttns:TTNSData"
 "reno.ttno"   = "aiida_renormalizer.data.ttno:TTNOData"
 
@@ -41,6 +41,8 @@ dev = [
 "reno.build_mpo" = "aiida_renormalizer.calculations.basic.build_mpo:BuildMPOCalcJob"
 "reno.expectation" = "aiida_renormalizer.calculations.basic.expectation:ExpectationCalcJob"
 "reno.compress" = "aiida_renormalizer.calculations.basic.compress:CompressCalcJob"
+"reno.max_entangled_mpdm" = "aiida_renormalizer.calculations.basic.max_entangled_mpdm:MaxEntangledMpdmCalcJob"
+"reno.model_from_symbolic" = "aiida_renormalizer.calculations.basic.model_from_symbolic:ModelFromSymbolicSpecCalcJob"
 # L1.5 LEGO CalcJobs
 "reno.compute_occupations" = "aiida_renormalizer.calculations.lego.occupations:ComputeOccupationsCalcJob"
 "reno.compute_msd" = "aiida_renormalizer.calculations.lego.msd:ComputeMsdCalcJob"
@@ -59,12 +61,16 @@ dev = [
 "reno.spectral_function" = "aiida_renormalizer.calculations.spectra.spectral_function:SpectralFunctionCalcJob"
 # Bath pipeline CalcJobs
 "reno.bath_spectral_density" = "aiida_renormalizer.calculations.bath.bath_spectral_density:BathSpectralDensityCalcJob"
+"reno.ohmic_renorm_modes" = "aiida_renormalizer.calculations.bath.ohmic_renorm_modes:OhmicRenormModesCalcJob"
 "reno.bath_discretization" = "aiida_renormalizer.calculations.bath.bath_discretization:BathDiscretizationCalcJob"
+"reno.bath_spin_boson_model" = "aiida_renormalizer.calculations.bath.bath_spin_boson_model:BathSpinBosonModelCalcJob"
+"reno.sbm_symbolic_spec_from_modes" = "aiida_renormalizer.calculations.bath.sbm_symbolic_spec_from_modes:SbmSymbolicSpecFromModesCalcJob"
 "reno.bath_to_mpo_coeff" = "aiida_renormalizer.calculations.bath.bath_to_mpo_coeff:BathToMPOCoeffCalcJob"
 # L3 Scripted CalcJob
 "reno.script" = "aiida_renormalizer.calculations.scripted:RenoScriptCalcJob"
 # TTN CalcJobs
 "reno.ttn_optimize" = "aiida_renormalizer.calculations.ttn.optimize_ttns:OptimizeTTNSCalcJob"
+"reno.ttn_symbolic_model" = "aiida_renormalizer.calculations.ttn.symbolic_model:TTNSymbolicModelCalcJob"
 "reno.ttns_evolve" = "aiida_renormalizer.calculations.ttn.ttns_evolve:TTNSEvolveCalcJob"
 "reno.ttns_symbolic_evolve" = "aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve:TTNSSymbolicEvolveCalcJob"
 "reno.ttns_expectation" = "aiida_renormalizer.calculations.ttn.observables:TTNSExpectationCalcJob"
@@ -101,7 +107,7 @@ dev = [
 "reno.charge_diffusion" = "aiida_renormalizer.workchains.charge_diffusion:ChargeDiffusionWorkChain"
 "reno.bath_mpo_pipeline" = "aiida_renormalizer.workchains.bath_mpo_pipeline:BathMPOPipelineWorkChain"
 "reno.bath_spin_boson_model" = "aiida_renormalizer.workchains.bath_spin_boson_model:BathSpinBosonModelWorkChain"
-"reno.sbm_spectral_modes" = "aiida_renormalizer.workchains.sbm_spectral_modes:SbmSpectralModesWorkChain"
+"reno.ohmic_renorm_modes" = "aiida_renormalizer.workchains.ohmic_renorm_modes:OhmicRenormModesWorkChain"
 "reno.sbm_model_from_modes" = "aiida_renormalizer.workchains.sbm_model_from_modes:SbmModelFromModesWorkChain"
 "reno.model_to_mpo" = "aiida_renormalizer.workchains.model_to_mpo:ModelToMPOWorkChain"
 "reno.mpo_to_initial_mps" = "aiida_renormalizer.workchains.mpo_to_initial_mps:MPOToInitialMPSWorkChain"

@@ -7,7 +7,7 @@ from aiida import orm
 from aiida.common.datastructures import CalcInfo, CodeInfo
 from aiida.engine import CalcJob, CalcJobProcessSpec
 
-from aiida_renormalizer.data import ConfigData, ModelData
+from aiida_renormalizer.data import ConfigData, ModelData, TensorNetworkLayoutData
 
 
 class RenoBaseCalcJob(CalcJob):
@@ -36,6 +36,12 @@ class RenoBaseCalcJob(CalcJob):
         )
         spec.input('config', valid_type=ConfigData, required=False,
                    help='Configuration (EvolveConfig/OptimizeConfig/CompressConfig)')
+        spec.input(
+            'tn_layout',
+            valid_type=TensorNetworkLayoutData,
+            required=False,
+            help='Optional shared tensor-network layout metadata for MPS/MPO/TTNS/TTNO reuse.',
+        )
         spec.input('code', valid_type=orm.Code, help='Code pointing to Python with renormalizer')
         spec.input(
             'metadata.options.artifact_storage_backend',
@@ -61,9 +67,23 @@ class RenoBaseCalcJob(CalcJob):
             spec.inputs['metadata']['options']['parser_name'].default = 'reno.base'
         except (TypeError, KeyError, AttributeError):
             pass
+        try:
+            # Provide a safe local default for examples and interactive runs.
+            spec.inputs['metadata']['options']['resources'].default = lambda: {
+                'num_machines': 1,
+                'num_mpiprocs_per_machine': 1,
+            }
+        except (TypeError, KeyError, AttributeError):
+            pass
         # Common outputs
         spec.output('output_parameters', valid_type=orm.Dict,
                     help='Convergence info, energies, observables, etc.')
+        spec.output(
+            'output_tn_layout',
+            valid_type=TensorNetworkLayoutData,
+            required=False,
+            help='Shared tensor-network layout metadata parsed or reused by this CalcJob.',
+        )
 
         # Exit codes (shared across all Reno CalcJobs, used by RenoBaseParser)
         spec.exit_code(100, 'ERROR_EXECUTION_FAILED', message='Remote execution failed')
@@ -139,8 +159,9 @@ class RenoBaseCalcJob(CalcJob):
 
         Subclasses can override to provide custom context.
         """
-        from jinja2 import Environment, FileSystemLoader
         import os
+
+        from jinja2 import Environment, FileSystemLoader
 
         template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
         env = Environment(loader=FileSystemLoader(template_dir))
@@ -164,6 +185,7 @@ class RenoBaseCalcJob(CalcJob):
         Subclasses should override to write calc-specific inputs.
         """
         import json
+
         from aiida_renormalizer.data.utils import read_json_from_repository
 
         # Write model.json when present. TTN jobs do not use ModelData.

@@ -32,6 +32,7 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
         output_parameters: orm.Dict - Always present
         output_mps: MPSData (optional) - If script creates MPS
         output_mpo: MPOData (optional) - If script creates MPO
+        output_tn_layout: TensorNetworkLayoutData (optional) - Shared layout metadata
         output_data: orm.Dict (optional) - Additional structured outputs
 
     Example script:

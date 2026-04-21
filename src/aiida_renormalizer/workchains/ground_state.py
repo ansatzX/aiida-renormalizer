@@ -6,7 +6,7 @@ from aiida.engine import WorkChain, ToContext, if_
 
 from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
 from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
-from aiida_renormalizer.data import ModelData, MPSData, MPOData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, TensorNetworkLayoutData
 
 
 class GroundStateWorkChain(WorkChain):
@@ -69,6 +69,7 @@ class GroundStateWorkChain(WorkChain):
             help="Energy convergence threshold",
         )
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
+        spec.input("tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
 
         # Additional strategy-specific inputs
         spec.input("omega", valid_type=orm.Float, required=False, help="Target eigenvalue (DMRG)")
@@ -78,6 +79,7 @@ class GroundStateWorkChain(WorkChain):
         # Outputs
         spec.output("ground_state", valid_type=MPSData, help="Ground state MPS")
         spec.output("energy", valid_type=orm.Float, help="Ground state energy")
+        spec.output("output_tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
         spec.output("output_parameters", valid_type=orm.Dict, help="Calculation statistics")
 
         # Exit codes
@@ -152,6 +154,8 @@ class GroundStateWorkChain(WorkChain):
         # Add omega for excited states
         if "omega" in self.inputs:
             inputs["omega"] = self.inputs.omega
+        if "tn_layout" in self.inputs:
+            inputs["tn_layout"] = self.inputs.tn_layout
 
         # Submit DMRG calculation
         future = self.submit(DMRGCalcJob, **inputs)
@@ -168,6 +172,10 @@ class GroundStateWorkChain(WorkChain):
 
         # Store results in context
         self.ctx.ground_state = calc.outputs.output_mps
+        if "output_tn_layout" in calc.outputs:
+            self.ctx.tn_layout = calc.outputs.output_tn_layout
+        elif "tn_layout" in self.inputs:
+            self.ctx.tn_layout = self.inputs.tn_layout
         self.ctx.energy = None
 
         # Extract energy from output parameters
@@ -213,6 +221,8 @@ class GroundStateWorkChain(WorkChain):
         # Add config if provided
         if "config" in self.inputs:
             inputs["config"] = self.inputs.config
+        if "tn_layout" in self.inputs:
+            inputs["tn_layout"] = self.inputs.tn_layout
 
         # Submit ImagTime calculation
         future = self.submit(ImagTimeCalcJob, **inputs)
@@ -229,6 +239,10 @@ class GroundStateWorkChain(WorkChain):
 
         # Store results in context
         self.ctx.ground_state = calc.outputs.output_mps
+        if "output_tn_layout" in calc.outputs:
+            self.ctx.tn_layout = calc.outputs.output_tn_layout
+        elif "tn_layout" in self.inputs:
+            self.ctx.tn_layout = self.inputs.tn_layout
         self.ctx.energy = None
 
         # Extract energy
@@ -259,6 +273,8 @@ class GroundStateWorkChain(WorkChain):
         energy = getattr(self.ctx, 'energy', None)
         if energy is not None:
             self.out("energy", orm.Float(energy))
+        if hasattr(self.ctx, "tn_layout"):
+            self.out("output_tn_layout", self.ctx.tn_layout)
 
         # Output statistics
         stats = {

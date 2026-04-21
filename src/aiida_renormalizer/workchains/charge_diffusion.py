@@ -8,7 +8,7 @@ from aiida.engine import WorkChain, ToContext, if_
 
 from aiida_renormalizer.calculations.spectra.charge_diffusion import ChargeDiffusionCalcJob
 from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
-from aiida_renormalizer.data import ModelData, MPSData, MPOData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, TensorNetworkLayoutData
 
 
 class ChargeDiffusionWorkChain(WorkChain):
@@ -105,11 +105,13 @@ class ChargeDiffusionWorkChain(WorkChain):
         spec.input("config", valid_type=orm.Dict, required=False, help="EvolveConfig")
         spec.input("compress_config", valid_type=orm.Dict, required=False, help="CompressConfig")
         spec.input("nsteps_thermal", valid_type=orm.Int, default=lambda: orm.Int(100), help="Thermal propagation steps")
+        spec.input("tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
 
         # Outputs
         spec.output("trajectory", valid_type=orm.ArrayData, help="MSD trajectory and time series")
         spec.output("thermal_state", valid_type=orm.Data, required=False, help="Thermal state used")
+        spec.output("output_tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
         spec.output("output_parameters", valid_type=orm.Dict, help="Diffusion statistics")
 
         # Exit codes
@@ -152,6 +154,8 @@ class ChargeDiffusionWorkChain(WorkChain):
 
         # Store temperature
         self.ctx.temperature = self.inputs.temperature.value
+        if "tn_layout" in self.inputs:
+            self.ctx.tn_layout = self.inputs.tn_layout
         self.report(f"Temperature: {self.ctx.temperature} a.u.")
 
     def needs_thermal_state(self):
@@ -172,6 +176,8 @@ class ChargeDiffusionWorkChain(WorkChain):
 
         if "mpo" in self.inputs:
             inputs["mpo"] = self.inputs.mpo
+        if hasattr(self.ctx, "tn_layout"):
+            inputs["tn_layout"] = self.ctx.tn_layout
 
         future = self.submit(ThermalPropCalcJob, **inputs)
 
@@ -186,6 +192,8 @@ class ChargeDiffusionWorkChain(WorkChain):
             return self.exit_codes.ERROR_THERMAL_STATE_FAILED
 
         self.ctx.thermal_state = calc.outputs.output_mps
+        if "output_tn_layout" in calc.outputs:
+            self.ctx.tn_layout = calc.outputs.output_tn_layout
         self.report("Thermal state prepared successfully")
 
     def run_diffusion(self):
@@ -215,6 +223,8 @@ class ChargeDiffusionWorkChain(WorkChain):
             inputs["config"] = self.inputs.config
         if "compress_config" in self.inputs:
             inputs["compress_config"] = self.inputs.compress_config
+        if hasattr(self.ctx, "tn_layout"):
+            inputs["tn_layout"] = self.ctx.tn_layout
 
         future = self.submit(ChargeDiffusionCalcJob, **inputs)
 
@@ -230,6 +240,8 @@ class ChargeDiffusionWorkChain(WorkChain):
 
         # Store results
         self.ctx.diffusion_params = calc.outputs.output_parameters.get_dict()
+        if "output_tn_layout" in calc.outputs:
+            self.ctx.tn_layout = calc.outputs.output_tn_layout
         self.report("Diffusion calculation completed successfully")
 
     def extract_trajectory(self):
@@ -285,6 +297,8 @@ class ChargeDiffusionWorkChain(WorkChain):
         # Output parameters
         params = orm.Dict(self.ctx.diffusion_params)
         self.out("output_parameters", params)
+        if hasattr(self.ctx, "tn_layout"):
+            self.out("output_tn_layout", self.ctx.tn_layout)
 
         # Calculate diffusion coefficient if MSD available
         if "r_square" in self.ctx.diffusion_params and "time_series" in self.ctx.diffusion_params:

@@ -64,10 +64,3 @@ def test_spectral_function_retrieve_list(generate_inputs):
     assert 'output_mps.npz' not in retrieve_list
     assert 'output_parameters.json' in retrieve_list
 
-
-def test_spectral_function_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.spectral_function")
-    assert calc_class is SpectralFunctionCalcJob

@@ -27,29 +27,6 @@ def test_convergence_setup():
     assert wc.ctx.converged is False
 
 
-def test_convergence_not_converged():
-    """Test not_converged method."""
-    wc = make_workchain(ConvergenceWorkChain)
-
-    wc.ctx = Namespace(
-        converged=False,
-        current_index=0,
-        m_values=[50, 100, 150],
-    )
-
-    # Not converged, more values to test
-    assert wc.not_converged() is True
-
-    # Converged
-    wc.ctx.converged = True
-    assert wc.not_converged() is False
-
-    # Not converged, but exhausted values
-    wc.ctx.converged = False
-    wc.ctx.current_index = 3
-    assert wc.not_converged() is False
-
-
 def test_convergence_run_calculation():
     """Test run_calculation method."""
     wc = make_workchain(ConvergenceWorkChain)

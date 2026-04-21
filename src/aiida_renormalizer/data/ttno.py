@@ -11,6 +11,7 @@ if t.TYPE_CHECKING:
     from renormalizer.tn.tree import TTNO
 
     from aiida_renormalizer.data.basis_tree import BasisTreeData
+    from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
 
 from aiida_renormalizer.data.artifacts import (
     build_artifact_manifest,
@@ -28,6 +29,7 @@ class TTNOData(Data):
         cls,
         ttno_obj: TTNO,
         basis_tree_data: BasisTreeData,
+        tn_layout_data: TensorNetworkLayoutData | None = None,
         *,
         storage_backend: str = "posix",
         storage_base: str | None = None,
@@ -48,6 +50,8 @@ class TTNOData(Data):
             str(np.result_type(*(nd.tensor.dtype for nd in ttno_obj.node_list))),
         )
         node.base.attributes.set("basis_tree_data_uuid", str(basis_tree_data.uuid))
+        if tn_layout_data is not None:
+            node.base.attributes.set("tn_layout_data_uuid", str(tn_layout_data.uuid))
 
         artifact = write_external_artifact(
             ttno_obj,
@@ -75,6 +79,14 @@ class TTNOData(Data):
     def basis_tree_data(self) -> BasisTreeData:
         """Retrieve the linked BasisTreeData node."""
         return get_linked_node(self.base.attributes.get("basis_tree_data_uuid"))
+
+    @property
+    def tn_layout_data(self) -> TensorNetworkLayoutData | None:
+        """Retrieve the linked TensorNetworkLayoutData node, if present."""
+        uuid = self.base.attributes.get("tn_layout_data_uuid")
+        if not uuid:
+            return None
+        return get_linked_node(uuid)
 
     @property
     def artifact_metadata(self) -> dict[str, t.Any]:

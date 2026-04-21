@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 import tempfile
 
 from aiida import orm
@@ -78,17 +79,16 @@ class OptimizeTTNSCalcJob(RenoBaseCalcJob):
         # Write model (from ttno)
         super()._write_input_files(folder)
 
-        # Write basis tree
+        # Write basis tree cache (fast path: reuse BasisTreeData serialized payload)
         basis_tree_data = self.inputs.basis_tree
-        basis_tree = basis_tree_data.load_basis_tree()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            basis_tree_path = os.path.join(tmpdir, "basis_tree")
-            basis_tree.dump(basis_tree_path)
-            actual = basis_tree_path + ".npz" if os.path.exists(basis_tree_path + ".npz") else basis_tree_path
-            with open(actual, "rb") as src:
-                with folder.open("input_basis_tree.npz", "wb") as dst:
-                    dst.write(src.read())
+        with folder.open("input_basis_tree.pkl", "wb") as dst:
+            if not basis_tree_data.write_cached_pickle(dst):
+                dst.write(
+                    pickle.dumps(
+                        basis_tree_data.load_basis_tree(),
+                        protocol=pickle.HIGHEST_PROTOCOL,
+                    )
+                )
 
         # Write TTNO
         ttno_data = self.inputs.ttno

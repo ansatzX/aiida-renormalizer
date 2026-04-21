@@ -23,7 +23,7 @@ class ParameterSweepWorkChain(WorkChain):
         parameter_name: Str - Name of parameter to sweep
         parameter_values: List - List of parameter values
         max_concurrent: Int - Maximum concurrent calculations (optional)
-        workchain_class: Str - Entry point name of WorkChain to run
+        calculation_class: Str - Entry point name of CalcJob to run
 
     Outputs:
         sweep_results: ArrayData - Aggregated results
@@ -64,9 +64,9 @@ class ParameterSweepWorkChain(WorkChain):
             help="Maximum number of concurrent calculations",
         )
         spec.input(
-            "workchain_class",
+            "calculation_class",
             valid_type=orm.Str,
-            help="Entry point name of WorkChain to run",
+            help="Entry point name of CalcJob to run",
         )
 
         # Outputs
@@ -113,14 +113,17 @@ class ParameterSweepWorkChain(WorkChain):
 
     def launch_sweep(self):
         """Launch all calculations in parallel."""
-        from aiida.plugins import WorkflowFactory
+        from aiida.engine import CalcJob
+        from aiida.plugins import CalculationFactory
 
-        # Load WorkChain class
-        workchain_entry_point = self.inputs.workchain_class.value
+        # Load CalcJob class
+        calculation_entry_point = self.inputs.calculation_class.value
         try:
-            WorkChainClass = WorkflowFactory(workchain_entry_point)
+            CalcJobClass = CalculationFactory(calculation_entry_point)
+            if not issubclass(CalcJobClass, CalcJob):
+                raise TypeError(f"{calculation_entry_point} is not a CalcJob entry point")
         except Exception as e:
-            self.report(f"ERROR: Failed to load WorkChain '{workchain_entry_point}': {e}")
+            self.report(f"ERROR: Failed to load CalcJob '{calculation_entry_point}': {e}")
             return self.exit_codes.ERROR_INVALID_SWEEP_PARAMETERS
 
         param_values = self.ctx.param_values
@@ -134,7 +137,7 @@ class ParameterSweepWorkChain(WorkChain):
 
             # Submit calculation
             try:
-                future = self.submit(WorkChainClass, **inputs)
+                future = self.submit(CalcJobClass, **inputs)
                 self.to_context(**{f"calc_{i}": future})
                 self.ctx.calculations.append(i)
                 self.report(f"Launched calculation {i}: {self.ctx.param_name}={param_value}")
@@ -221,12 +224,12 @@ class ParameterSweepWorkChain(WorkChain):
 class TemperatureSweepWorkChain(ParameterSweepWorkChain):
     """WorkChain for temperature sweep (finite-temperature calculations).
 
-    Sweeps over temperature values and runs a WorkChain for each temperature.
+    Sweeps over temperature values and runs a CalcJob for each temperature.
 
     Inputs:
         base_inputs: Dict - Base inputs (without temperature)
         temperatures: List - List of temperature values
-        workchain_class: Str - Entry point name (e.g., 'reno.thermal_state')
+        calculation_class: Str - Entry point name (e.g., 'reno.thermal_prop')
 
     Outputs:
         sweep_results: ArrayData - Temperature vs. observable data
@@ -293,12 +296,12 @@ class TemperatureSweepWorkChain(ParameterSweepWorkChain):
 class BondDimensionSweepWorkChain(ParameterSweepWorkChain):
     """WorkChain for bond dimension sweep (convergence testing).
 
-    Sweeps over bond dimension values and runs a WorkChain for each.
+    Sweeps over bond dimension values and runs a CalcJob for each.
 
     Inputs:
         base_inputs: Dict - Base inputs
         m_values: List - List of bond dimensions
-        workchain_class: Str - Entry point name (e.g., 'reno.ground_state')
+        calculation_class: Str - Entry point name (e.g., 'reno.dmrg')
 
     Outputs:
         sweep_results: ArrayData - Bond dimension vs. energy data
@@ -368,12 +371,12 @@ class BondDimensionSweepWorkChain(ParameterSweepWorkChain):
 class FrequencySweepWorkChain(ParameterSweepWorkChain):
     """WorkChain for frequency sweep (spectra calculations).
 
-    Sweeps over frequency values and runs a WorkChain for each frequency.
+    Sweeps over frequency values and runs a CalcJob for each frequency.
 
     Inputs:
         base_inputs: Dict - Base inputs
         frequencies: List - List of frequency values
-        workchain_class: Str - Entry point name (e.g., 'reno.absorption')
+        calculation_class: Str - Entry point name (e.g., 'reno.spectra_zero_t')
 
     Outputs:
         sweep_results: ArrayData - Frequency vs. spectrum intensity

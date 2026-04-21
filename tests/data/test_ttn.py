@@ -26,6 +26,23 @@ class TestBasisTreeData:
         assert len(restored) == len(basis_tree)
         assert restored.qn_size == basis_tree.qn_size
 
+    def test_basis_tree_compiled_cache_available(self, aiida_profile, sho_basis, tmp_path):
+        from renormalizer.tn.treebase import BasisTree
+
+        from aiida_renormalizer.data.basis_tree import BasisTreeData
+
+        basis_tree = BasisTree.binary(sho_basis)
+        node = BasisTreeData.from_basis_tree(basis_tree)
+        node.store()
+
+        out_path = tmp_path / "basis_tree_cached.npz"
+        with out_path.open("wb") as handle:
+            wrote = node.write_cached_pickle(handle)
+
+        assert wrote is True
+        assert out_path.exists()
+        assert out_path.stat().st_size > 0
+
 
 class TestTTNSData:
     """Tests for TTNSData serialization."""
@@ -138,6 +155,7 @@ class TestTTNSData:
         from renormalizer.tn.treebase import BasisTree
 
         from aiida_renormalizer.data.basis_tree import BasisTreeData
+        from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
         from aiida_renormalizer.data.ttns import TTNSData
 
         basis_tree = BasisTree.binary(sho_basis)
@@ -145,10 +163,13 @@ class TestTTNSData:
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
+        layout_node = TensorNetworkLayoutData.from_basis_tree_data(basis_tree_node)
+        layout_node.store()
 
         ttns_node = TTNSData.from_ttns(
             TTNS,
             basis_tree_node,
+            layout_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "artifacts"),
             relative_path="states/ttns.npz",
@@ -157,6 +178,8 @@ class TestTTNSData:
 
         retrieved_basis_node = ttns_node.basis_tree_data
         assert retrieved_basis_node.uuid == basis_tree_node.uuid
+        assert ttns_node.tn_layout_data is not None
+        assert ttns_node.tn_layout_data.uuid == layout_node.uuid
 
 
 class TestTTNOData:

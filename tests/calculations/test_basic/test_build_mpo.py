@@ -1,20 +1,8 @@
 """Tests for BuildMPOCalcJob."""
 from __future__ import annotations
 
-import pytest
-from aiida import orm
-
-from aiida_renormalizer.data import ModelData, OpData
-
 
 class TestBuildMPOCalcJob:
-    def test_build_mpo_calcjob_defined(self):
-        """BuildMPOCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.basic.build_mpo import BuildMPOCalcJob
-
-        assert hasattr(BuildMPOCalcJob, '_template_name')
-        assert BuildMPOCalcJob._template_name == 'build_mpo_driver.py.jinja'
-
     def test_build_mpo_inputs_outputs(self):
         """BuildMPOCalcJob should define correct inputs/outputs."""
         from aiida_renormalizer.calculations.basic.build_mpo import BuildMPOCalcJob

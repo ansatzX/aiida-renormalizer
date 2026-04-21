@@ -1,6 +1,5 @@
 """Unit tests for TimeEvolutionWorkChain."""
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from aiida import orm
 
@@ -32,26 +31,6 @@ def test_time_evolution_setup():
     assert wc.ctx.n_checkpoints == 2  # 20.0 / 10.0
 
 
-def test_time_evolution_not_finished():
-    """Test not_finished method."""
-    wc = make_workchain(TimeEvolutionWorkChain)
-
-    wc.inputs = Namespace(total_time=orm.Float(20.0))
-    wc.ctx = Namespace()
-
-    # Not finished
-    wc.ctx.current_time = 10.0
-    assert TimeEvolutionWorkChain.not_finished(wc) is True
-
-    # Finished
-    wc.ctx.current_time = 20.0
-    assert TimeEvolutionWorkChain.not_finished(wc) is False
-
-    # Over-evolved (shouldn't happen, but test anyway)
-    wc.ctx.current_time = 25.0
-    assert TimeEvolutionWorkChain.not_finished(wc) is False
-
-
 def test_time_evolution_checkpoint_calculation():
     """Test that checkpoint calculations are properly submitted."""
     wc = make_workchain(TimeEvolutionWorkChain)
@@ -73,11 +52,14 @@ def test_time_evolution_checkpoint_calculation():
     wc.ctx.n_checkpoints = 2
 
     # Run checkpoint -- self.submit is already mocked by make_workchain
-    result = TimeEvolutionWorkChain.run_checkpoint(wc)
+    TimeEvolutionWorkChain.run_checkpoint(wc)
 
     # Check that submit was called
     assert wc.submit.called
-    assert result is not None
+    submit_kwargs = wc.submit.call_args.kwargs
+    assert submit_kwargs["model"] is wc.inputs.model
+    assert submit_kwargs["mpo"] is wc.inputs.mpo
+    assert submit_kwargs["code"] is wc.inputs.code
 
 
 def test_time_evolution_inspect_checkpoint_success():

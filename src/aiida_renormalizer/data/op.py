@@ -58,6 +58,20 @@ class OpData(Data):
     """AiiDA Data node wrapping a Renormalizer Op or OpSum."""
 
     @classmethod
+    def from_serialized_opsum(cls, serialized_opsum: list[dict]) -> OpData:
+        """Create an OpData node directly from serialized OpSum payload."""
+        node = cls()
+        node.base.attributes.set("op_type", "OpSum")
+        all_dofs: set[str] = set()
+        for term in serialized_opsum:
+            for dof in term.get("dofs", []):
+                all_dofs.add(str(dof))
+        node.base.attributes.set("dofs", sorted(all_dofs))
+        node.base.attributes.set("n_terms", len(serialized_opsum))
+        write_json_to_repository(node, serialized_opsum, "op.json")
+        return node
+
+    @classmethod
     def from_op(cls, op: Op) -> OpData:
         """Create an OpData node from a single Op."""
         node = cls()

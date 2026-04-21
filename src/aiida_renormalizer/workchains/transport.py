@@ -4,8 +4,9 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
+from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
 from aiida_renormalizer.calculations.spectra.kubo import KuboCalcJob
-from aiida_renormalizer.data import ModelData, MPSData, MPOData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, TensorNetworkLayoutData
 
 
 class KuboTransportWorkChain(WorkChain):
@@ -113,11 +114,13 @@ class KuboTransportWorkChain(WorkChain):
 
         # Inputs - Code
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
+        spec.input("tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
 
         # Outputs
         spec.output("conductivity", valid_type=orm.ArrayData, help="Conductivity tensor")
         spec.output("mobility", valid_type=orm.Float, required=False, help="Mobility")
         spec.output("autocorrelation", valid_type=orm.ArrayData, help="Current-current correlation")
+        spec.output("output_tn_layout", valid_type=TensorNetworkLayoutData, required=False, help="Shared tensor-network layout metadata")
         spec.output("output_parameters", valid_type=orm.Dict, help="Transport statistics")
 
         # Exit codes
@@ -180,21 +183,21 @@ class KuboTransportWorkChain(WorkChain):
                 return self.exit_codes.ERROR_INVALID_TEMPERATURE
             self.ctx.beta = beta
             self.ctx.temperature = 1.0 / beta
+        if "tn_layout" in self.inputs:
+            self.ctx.tn_layout = self.inputs.tn_layout
 
         self.report(f"Target: beta={self.ctx.beta}, temperature={self.ctx.temperature}")
 
     def prepare_thermal_state(self):
         """Prepare thermal density matrix if not provided."""
-        from aiida_renormalizer.workchains.thermal import ThermalStateWorkChain
-
         # Check if thermal state is already provided
         if "initial_mps" in self.inputs:
             self.report("Using provided thermal state")
             self.ctx.thermal_mpdm = self.inputs.initial_mps
             return
 
-        # Otherwise, prepare thermal state via ThermalStateWorkChain
-        self.report("Preparing thermal state via ThermalStateWorkChain")
+        # Otherwise, prepare thermal state via ThermalPropCalcJob
+        self.report("Preparing thermal state via ThermalPropCalcJob")
 
         inputs = {
             "model": self.inputs.model,
@@ -205,15 +208,17 @@ class KuboTransportWorkChain(WorkChain):
         # Add MPO if provided
         if "mpo" in self.inputs:
             inputs["mpo"] = self.inputs.mpo
+        if hasattr(self.ctx, "tn_layout"):
+            inputs["tn_layout"] = self.ctx.tn_layout
 
         # Add config if provided
         if "config" in self.inputs:
             inputs["config"] = self.inputs.config
 
         # Submit thermal state preparation
-        future = self.submit(ThermalStateWorkChain, **inputs)
+        future = self.submit(ThermalPropCalcJob, **inputs)
 
-        return ToContext(thermal_state_workchain=future)
+        return ToContext(thermal_state_calc=future)
 
     def run_kubo_calculation(self):
         """Run KuboCalcJob for current-current correlation."""
@@ -223,7 +228,13 @@ class KuboTransportWorkChain(WorkChain):
         if "initial_mps" in self.inputs:
             thermal_mpdm = self.ctx.thermal_mpdm
         else:
-            thermal_mpdm = self.ctx.thermal_state_workchain.outputs.thermal_mpdm
+            thermal_calc = self.ctx.thermal_state_calc
+            if not thermal_calc.is_finished_ok:
+                self.report(f"Thermal state calculation failed: exit_status={thermal_calc.exit_status}")
+                return self.exit_codes.ERROR_THERMAL_STATE_FAILED
+            thermal_mpdm = thermal_calc.outputs.output_mps
+            if "output_tn_layout" in thermal_calc.outputs:
+                self.ctx.tn_layout = thermal_calc.outputs.output_tn_layout
 
         # Build inputs
         inputs = {
@@ -247,6 +258,8 @@ class KuboTransportWorkChain(WorkChain):
         # Add config if provided
         if "config" in self.inputs:
             inputs["config"] = self.inputs.config
+        if hasattr(self.ctx, "tn_layout"):
+            inputs["tn_layout"] = self.ctx.tn_layout
 
         # Submit Kubo calculation
         future = self.submit(KuboCalcJob, **inputs)
@@ -279,6 +292,10 @@ class KuboTransportWorkChain(WorkChain):
         # Output autocorrelation
         if "autocorrelation" in calc.outputs:
             self.out("autocorrelation", calc.outputs.autocorrelation)
+        if "output_tn_layout" in calc.outputs:
+            self.out("output_tn_layout", calc.outputs.output_tn_layout)
+        elif hasattr(self.ctx, "tn_layout"):
+            self.out("output_tn_layout", self.ctx.tn_layout)
 
         # Output mobility (optional)
         if "mobility" in calc.outputs:

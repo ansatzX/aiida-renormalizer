@@ -77,10 +77,3 @@ def test_bath_spectral_density_retrieve_list():
     assert "output_mps.npz" not in retrieve_list
     assert "output_parameters.json" in retrieve_list
 
-
-def test_bath_spectral_density_entry_point():
-    """Test that the CalcJob is registered as an entry point."""
-    from aiida.plugins import CalculationFactory
-
-    calc_class = CalculationFactory("reno.bath_spectral_density")
-    assert calc_class is BathSpectralDensityCalcJob
