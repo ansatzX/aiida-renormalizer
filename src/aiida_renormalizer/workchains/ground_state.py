@@ -6,7 +6,7 @@ from aiida.engine import WorkChain, ToContext, if_
 
 from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
 from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class GroundStateWorkChain(WorkChain):
@@ -23,15 +23,15 @@ class GroundStateWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator (optional, will be built if not provided)
-        initial_mps: MpsData (optional) - Initial guess
+        mpo: MPOData - Hamiltonian operator (optional, will be built if not provided)
+        initial_mps: MPSData (optional) - Initial guess
         strategy: Str - "dmrg" or "imag_time" (default: "dmrg")
         config: ConfigData - Optimization/evolution configuration
         energy_convergence: Float - Energy convergence threshold
         code: AbstractCode - Code to use
 
     Outputs:
-        ground_state: MpsData - Ground state MPS
+        ground_state: MPSData - Ground state MPS
         energy: Float - Ground state energy
         output_parameters: Dict - Calculation statistics
     """
@@ -45,13 +45,13 @@ class GroundStateWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="System definition")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (will be built if not provided)",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS guess (random if not provided)",
         )
@@ -76,7 +76,7 @@ class GroundStateWorkChain(WorkChain):
         spec.input("dt", valid_type=orm.Float, required=False, help="Time step (ImagTime)")
 
         # Outputs
-        spec.output("ground_state", valid_type=MpsData, help="Ground state MPS")
+        spec.output("ground_state", valid_type=MPSData, help="Ground state MPS")
         spec.output("energy", valid_type=orm.Float, help="Ground state energy")
         spec.output("output_parameters", valid_type=orm.Dict, help="Calculation statistics")
 

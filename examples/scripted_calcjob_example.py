@@ -7,7 +7,7 @@ multi-step workflows with AiiDA data provenance.
 from aiida import orm, load_profile
 from aiida.engine import run_get_node
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 from aiida_renormalizer.calculations.scripted import RenoScriptCalcJob
 
 
@@ -36,24 +36,24 @@ def example_1_simple_expectation():
 
     # 2. Create MPS
     from renormalizer.mps import Mps
-    mps = Mps.random(model, qntot=0, m_max=20)
-    mps_data = MpsData.from_mps(mps, model_data)
+    MPS = Mps.random(model, qntot=0, m_max=20)
+    mps_data = MPSData.from_mps(MPS, model_data)
 
     # 3. Create MPO
     from renormalizer.mps import Mpo
-    mpo = Mpo(model)
-    mpo_data = MpoData.from_mpo(mpo, model_data)
+    MPO = Mpo(model)
+    mpo_data = MPOData.from_mpo(MPO, model_data)
 
     # 4. Define custom script
     script = """
 # Calculate expectation value
-energy = mps.expectation(mpo)
+energy = MPS.expectation(MPO)
 
 # Save results
 save_output_parameters({
     'energy': energy,
-    'bond_dims': [int(d) for d in mps.bond_dims],
-    'n_sites': len(mps),
+    'bond_dims': [int(d) for d in MPS.bond_dims],
+    'n_sites': len(MPS),
 })
 """
 
@@ -65,8 +65,8 @@ save_output_parameters({
     builder.code = code
     builder.script = orm.Str(script)
     builder.model = model_data
-    builder.mps = mps_data
-    builder.mpo = mpo_data
+    builder.MPS = mps_data
+    builder.MPO = mpo_data
 
     # Run
     result, node = run_get_node(builder)
@@ -88,13 +88,13 @@ def example_2_time_evolution():
 
     # 2. Create initial MPS
     from renormalizer.mps import Mps
-    mps = Mps.random(model, qntot=0, m_max=30)
-    mps_data = MpsData.from_mps(mps, model_data)
+    MPS = Mps.random(model, qntot=0, m_max=30)
+    mps_data = MPSData.from_mps(MPS, model_data)
 
     # 3. Create MPO
     from renormalizer.mps import Mpo
-    mpo = Mpo(model)
-    mpo_data = MpoData.from_mpo(mpo, model_data)
+    MPO = Mpo(model)
+    mpo_data = MPOData.from_mpo(MPO, model_data)
 
     # 4. Define custom evolution script
     script = """
@@ -109,10 +109,10 @@ dt = inputs['dt']
 energies = []
 for i in range(n_steps):
     # Evolve
-    mps.evolve(mpo, dt)
+    MPS.evolve(MPO, dt)
 
     # Measure
-    e = mps.expectation(mpo)
+    e = MPS.expectation(MPO)
     energies.append(e)
 
 # Calculate additional observables
@@ -129,7 +129,7 @@ save_output_parameters({
 })
 
 # Save final MPS
-save_mps(mps, 'output_mps.npz', f'Evolved state after {n_steps} steps')
+save_mps(MPS, 'output_mps.npz', f'Evolved state after {n_steps} steps')
 """
 
     # 5. Build and submit
@@ -139,8 +139,8 @@ save_mps(mps, 'output_mps.npz', f'Evolved state after {n_steps} steps')
     builder.code = code
     builder.script = orm.Str(script)
     builder.model = model_data
-    builder.mps = mps_data
-    builder.mpo = mpo_data
+    builder.MPS = mps_data
+    builder.MPO = mpo_data
     builder.inputs = orm.Dict({
         'n_steps': 100,
         'dt': 0.01,
@@ -167,8 +167,8 @@ def example_3_multi_observable_scan():
 
     # 2. Create MPS
     from renormalizer.mps import Mps
-    mps = Mps.random(model, qntot=0, m_max=20)
-    mps_data = MpsData.from_mps(mps, model_data)
+    MPS = Mps.random(model, qntot=0, m_max=20)
+    mps_data = MPSData.from_mps(MPS, model_data)
 
     # 3. Define custom observable calculation script
     script = """
@@ -180,7 +180,7 @@ from renormalizer.model.op import Op
 observables = {}
 
 # 1. Energy (from existing MPO)
-observables['energy'] = mps.expectation(mpo)
+observables['energy'] = MPS.expectation(MPO)
 
 # 2. Build and measure additional observables
 # Example: spin correlation
@@ -189,11 +189,11 @@ for i in range(len(model)):
         # Build correlation operator
         op_terms = [Op(r"a^\\dagger a", (i, j), 1.0)]
         correlation_mpo = Mpo(model, op_terms)
-        value = mps.expectation(correlation_mpo)
+        value = MPS.expectation(correlation_mpo)
         observables[f'correlation_{i}_{j}'] = value
 
 # 3. Entanglement entropy
-entropies = [float(s) for s in mps.calc_entropy("bond")]
+entropies = [float(s) for s in MPS.calc_entropy("bond")]
 observables['entanglement_entropy'] = entropies
 observables['mean_entropy'] = float(np.mean(entropies))
 
@@ -208,13 +208,13 @@ save_output_parameters(observables)
     builder.code = code
     builder.script = orm.Str(script)
     builder.model = model_data
-    builder.mps = mps_data
+    builder.MPS = mps_data
 
     # Note: MPO is optional for this script
     from renormalizer.mps import Mpo
-    mpo = Mpo(model)
-    mpo_data = MpoData.from_mpo(mpo, model_data)
-    builder.mpo = mpo_data
+    MPO = Mpo(model)
+    mpo_data = MPOData.from_mpo(MPO, model_data)
+    builder.MPO = mpo_data
 
     # Run
     result, node = run_get_node(builder)

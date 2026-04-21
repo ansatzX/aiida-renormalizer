@@ -1,24 +1,16 @@
-# TTNS TDVP-PS Example
+# SBM TTNS TDVP-PS Example
 
-This example focuses on plugin correctness:
-- one-shot run uses `TtnsSymbolicEvolveCalcJob` with symbolic inputs only
-- no local `renormalizer` object construction in user script
-- heavy TTNS/TTNO build + evolution are executed inside CalcJob runtime
-- `t=0` trajectory point is explicitly checked
+This example now uses a **single editable script**:
 
-## 1) One-shot Python script (symbolic input)
+- `run_one_shot.py`
+
+Edit parameters directly at the top of the script and run:
 
 ```bash
 verdi run examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py
 ```
 
-## 2) Multi-step `verdi` CLI flow (symbolic inputs)
+Notes:
 
-```bash
-bash examples/ttn/sbm_ttns_tdvp_ps/run_via_verdi.sh
-```
-
-The shell script runs:
-1. `verdi run prepare_symbolic_inputs.py`
-2. `verdi run launch_symbolic_calcjob.py ...`
-3. `verdi process show <PROCESS_PK>`
+- The declared process is explicit and user-editable in script form.
+- Adiabatic renormalization is included as a required step in this example flow.

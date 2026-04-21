@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class DMRGCalcJob(RenoBaseCalcJob):
@@ -18,12 +18,12 @@ class DMRGCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
-        initial_mps: MpsData (optional) - Initial guess, random if not provided
+        mpo: MPOData - Hamiltonian operator
+        initial_mps: MPSData (optional) - Initial guess, random if not provided
         config: ConfigData - OptimizeConfig with convergence criteria
 
     Outputs:
-        output_mps: MpsData - Optimized ground state
+        output_mps: MPSData - Optimized ground state
         output_parameters: Dict - Energy trajectory, convergence info
     """
 
@@ -36,12 +36,12 @@ class DMRGCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             help="Hamiltonian MPO for optimization",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS guess (random if not provided)",
         )
@@ -55,7 +55,7 @@ class DMRGCalcJob(RenoBaseCalcJob):
         # Outputs
         spec.output(
             "output_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="Optimized ground state MPS",
         )
 
@@ -82,11 +82,11 @@ class DMRGCalcJob(RenoBaseCalcJob):
         # Write MPO
         mpo_data = self.inputs.mpo
         model_data = self.inputs.model
-        mpo = mpo_data.load_mpo(model_data)
+        MPO = mpo_data.load_mpo(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mpo_path = os.path.join(tmpdir, "mpo")
-            mpo.dump(mpo_path)
+            MPO.dump(mpo_path)
             actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mpo.npz", "wb") as dst:
@@ -95,11 +95,11 @@ class DMRGCalcJob(RenoBaseCalcJob):
         # Write initial MPS (if provided)
         if "initial_mps" in self.inputs:
             mps_data = self.inputs.initial_mps
-            mps = mps_data.load_mps(model_data)
+            MPS = mps_data.load_mps(model_data)
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 mps_path = os.path.join(tmpdir, "mps")
-                mps.dump(mps_path)
+                MPS.dump(mps_path)
                 actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
                 with open(actual, "rb") as src:
                     with folder.open("initial_mps.npz", "wb") as dst:

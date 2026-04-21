@@ -1,4 +1,4 @@
-"""Driver script for TtnsMutualInfoCalcJob.
+"""Driver script for TTNSMutualInfoCalcJob.
 
 Compute mutual information between nodes.
 """
@@ -37,9 +37,9 @@ def save_output_parameters(params, output_file='output_parameters.json'):
 if __name__ == '__main__':
     # Load inputs
     basis_tree = load_basis_tree()
-    ttns = load_ttns('initial_ttns.npz', basis_tree)
+    TTNS = load_ttns('initial_ttns.npz', basis_tree)
 
-    n_nodes = len(ttns)
+    n_nodes = len(TTNS)
 
     # Compute mutual information between nodes
     # Note: This requires RDM computation
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     # Prepare output parameters
     output_params = {
-        'calcjob_class': 'TtnsMutualInfoCalcJob',
+        'calcjob_class': 'TTNSMutualInfoCalcJob',
         'calc_type': 'mutual_info',
         'mutual_info_matrix': mutual_info_matrix.tolist(),
         'n_nodes': n_nodes,

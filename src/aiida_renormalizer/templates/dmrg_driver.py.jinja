@@ -87,10 +87,10 @@ if __name__ == '__main__':
 
     # Load or create initial MPS
     {% if has_initial_mps %}
-    mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
     {% else %}
     # Create random MPS as initial guess
-    mps = Mps.random(model, qntot=0, m_max=50)
+    MPS = Mps.random(model, qntot=0, m_max=50)
     {% endif %}
 
     # Load omega (if provided)
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     {% endif %}
 
     # Run DMRG optimization
-    energy_trajectory, optimized_mps = optimize_mps(mps, mpo, omega)
+    energy_trajectory, optimized_mps = optimize_mps(MPS, mpo, omega)
 
     # Prepare output parameters
     # energy_trajectory is a list for nroots=1 or list of lists for nroots>1

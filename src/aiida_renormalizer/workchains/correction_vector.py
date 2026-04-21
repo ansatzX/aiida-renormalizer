@@ -8,7 +8,7 @@ from aiida.engine import WorkChain, ToContext, if_
 
 from aiida_renormalizer.calculations.spectra.correction_vector import CorrectionVectorCalcJob
 from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class CorrectionVectorWorkChain(WorkChain):
@@ -28,8 +28,8 @@ class CorrectionVectorWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData (optional) - Hamiltonian operator
-        ground_state: MpsData (optional) - Pre-computed ground state
+        mpo: MPOData (optional) - Hamiltonian operator
+        ground_state: MPSData (optional) - Pre-computed ground state
         frequencies: ArrayData - Frequency grid
         eta: Float - Broadening parameter
         m_max: Int - Maximum bond dimension
@@ -41,7 +41,7 @@ class CorrectionVectorWorkChain(WorkChain):
 
     Outputs:
         spectrum: ArrayData - Full spectrum (frequency vs intensity)
-        ground_state: MpsData - Ground state used
+        ground_state: MPSData - Ground state used
         output_parameters: Dict - Spectrum data and statistics
     """
 
@@ -54,13 +54,13 @@ class CorrectionVectorWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="System definition")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (built if not provided)",
         )
         spec.input(
             "ground_state",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Pre-computed ground state (will be computed if not provided)",
         )
@@ -121,7 +121,7 @@ class CorrectionVectorWorkChain(WorkChain):
 
         # Outputs
         spec.output("spectrum", valid_type=orm.ArrayData, help="Full spectrum (frequency vs intensity)")
-        spec.output("ground_state", valid_type=MpsData, help="Ground state used")
+        spec.output("ground_state", valid_type=MPSData, help="Ground state used")
         spec.output("output_parameters", valid_type=orm.Dict, help="Spectrum data and statistics")
 
         # Exit codes

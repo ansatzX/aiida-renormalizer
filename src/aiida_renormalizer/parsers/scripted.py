@@ -11,7 +11,7 @@ from aiida import orm
 from aiida.engine import ExitCode
 from aiida.parsers import Parser
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ScriptedParser(Parser):
@@ -19,8 +19,8 @@ class ScriptedParser(Parser):
 
     Responsibilities:
     1. Parse output_parameters.json → orm.Dict (required)
-    2. Parse output_mps.npz → MpsData (if present, requires model input)
-    3. Parse output_mpo.npz → MpoData (if present, requires model input)
+    2. Parse output_mps.npz → MPSData (if present, requires model input)
+    3. Parse output_mpo.npz → MPOData (if present, requires model input)
     4. Parse output_data.json → orm.Dict (if present)
     5. Physical validation (NaN checks)
     6. Map error conditions to exit codes
@@ -99,8 +99,8 @@ class ScriptedParser(Parser):
 
         return ExitCode()
 
-    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MpsData:
-        """Parse an MPS .npz file into MpsData node."""
+    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MPSData:
+        """Parse an MPS .npz file into MPSData node."""
         with self.retrieved.open(filename, 'rb') as f:
             with tempfile.NamedTemporaryFile(suffix='.npz', delete=False) as tmp:
                 tmp.write(f.read())
@@ -115,14 +115,14 @@ class ScriptedParser(Parser):
 
             if is_mpdm:
                 from renormalizer.mps import MpDm
-                mps = MpDm.load(model, tmp_path)
+                MPS = MpDm.load(model, tmp_path)
             else:
                 from renormalizer.mps import Mps
-                mps = Mps.load(model, tmp_path)
+                MPS = Mps.load(model, tmp_path)
 
             storage_backend, storage_base, relative_path = self._get_artifact_location(filename)
-            mps_data = MpsData.from_mps(
-                mps,
+            mps_data = MPSData.from_mps(
+                MPS,
                 model_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
@@ -133,8 +133,8 @@ class ScriptedParser(Parser):
             import os
             os.unlink(tmp_path)
 
-    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MpoData:
-        """Parse an MPO .npz file into MpoData node."""
+    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MPOData:
+        """Parse an MPO .npz file into MPOData node."""
         import tempfile
 
         with self.retrieved.open(filename, 'rb') as f:
@@ -148,7 +148,7 @@ class ScriptedParser(Parser):
             mpo = Mpo.load(model, tmp_path)
 
             storage_backend, storage_base, relative_path = self._get_artifact_location(filename)
-            mpo_data = MpoData.from_mpo(
+            mpo_data = MPOData.from_mpo(
                 mpo,
                 model_data,
                 storage_backend=storage_backend,

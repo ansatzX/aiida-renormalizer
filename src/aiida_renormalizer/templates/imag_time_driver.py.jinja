@@ -96,10 +96,10 @@ if __name__ == '__main__':
 
     # Load or create initial MPS
     {% if has_initial_mps %}
-    mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
     {% else %}
     # Create random MPS as initial state
-    mps = Mps.random(model, qntot=0, m_max=50)
+    MPS = Mps.random(model, qntot=0, m_max=50)
     {% endif %}
 
     # Determine time step if not provided
@@ -111,18 +111,18 @@ if __name__ == '__main__':
     n_steps = int(beta / dt)
     energy_trajectory = []
 
-    current_mps = mps
+    current_MPS = MPS
     for step in range(n_steps):
         # Evolve by -i*dt (imaginary time step)
         evolve_dt = -1j * dt
-        current_mps = current_mps.evolve(mpo, evolve_dt, normalize=True)
+        current_MPS = current_MPS.evolve(mpo, evolve_dt, normalize=True)
 
         # Compute energy
-        energy = current_mps.expectation(mpo)
+        energy = current_MPS.expectation(mpo)
         energy_trajectory.append(energy.real)
 
     # Final state
-    final_mps = current_mps
+    final_MPS = current_MPS
     final_energy = energy_trajectory[-1]
 
     output_params = {
@@ -133,13 +133,13 @@ if __name__ == '__main__':
         'beta': beta,
         'dt': dt,
         'n_steps': n_steps,
-        'bond_dims': [int(d) for d in final_mps.bond_dims],
-        'bond_dims_mean': float(final_mps.bond_dims_mean),
-        'n_sites': len(final_mps),
+        'bond_dims': [int(d) for d in final_MPS.bond_dims],
+        'bond_dims_mean': float(final_MPS.bond_dims_mean),
+        'n_sites': len(final_MPS),
         'converged': True,  # Would need actual convergence check
     }
     save_output_parameters(output_params)
 
     # Save final MPS with description
     description = f'Imaginary time evolved MPS, E={final_energy:.10f}'
-    save_mps(final_mps, 'output_mps.npz', description)
+    save_mps(final_MPS, 'output_mps.npz', description)

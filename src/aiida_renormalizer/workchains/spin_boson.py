@@ -8,7 +8,7 @@ from aiida.engine import WorkChain, ToContext, if_, while_
 
 from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
 from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class SpinBosonWorkChain(WorkChain):
@@ -29,8 +29,8 @@ class SpinBosonWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - Spin-boson model definition
-        mpo: MpoData (optional) - Hamiltonian operator
-        initial_state: MpsData (optional) - Initial state
+        mpo: MPOData (optional) - Hamiltonian operator
+        initial_state: MPSData (optional) - Initial state
         initial_spin: Str - Initial spin state: "up", "down", or "superposition"
         temperature: Float - Temperature for thermal initial state
         total_time: Float - Total evolution time
@@ -43,7 +43,7 @@ class SpinBosonWorkChain(WorkChain):
 
     Outputs:
         trajectory: ArrayData - Time evolution of observables
-        final_state: MpsData - Final evolved state
+        final_state: MPSData - Final evolved state
         output_parameters: Dict - Dynamics statistics
     """
 
@@ -56,13 +56,13 @@ class SpinBosonWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="Spin-boson model definition")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (built if not provided)",
         )
         spec.input(
             "initial_state",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial state (will be prepared if not provided)",
         )
@@ -107,7 +107,7 @@ class SpinBosonWorkChain(WorkChain):
 
         # Outputs
         spec.output("trajectory", valid_type=orm.ArrayData, help="Time evolution of observables")
-        spec.output("final_state", valid_type=MpsData, help="Final evolved state")
+        spec.output("final_state", valid_type=MPSData, help="Final evolved state")
         spec.output("output_parameters", valid_type=orm.Dict, help="Dynamics statistics")
 
         # Exit codes

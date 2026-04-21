@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ThermalPropCalcJob(RenoBaseCalcJob):
@@ -19,12 +19,12 @@ class ThermalPropCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
+        mpo: MPOData - Hamiltonian operator
         temperature: Float - Target temperature
         config: ConfigData - EvolveConfig parameters
 
     Outputs:
-        output_mps: MpsData (actually MpDm) - Thermal density matrix
+        output_mps: MPSData (actually MpDm) - Thermal density matrix
         output_parameters: Dict - Temperature, free energy, etc.
     """
 
@@ -37,7 +37,7 @@ class ThermalPropCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             help="Hamiltonian MPO",
         )
         spec.input(
@@ -65,7 +65,7 @@ class ThermalPropCalcJob(RenoBaseCalcJob):
         # Outputs
         spec.output(
             "output_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="Thermal density matrix (MpDm)",
         )
 
@@ -91,11 +91,11 @@ class ThermalPropCalcJob(RenoBaseCalcJob):
         # Write MPO
         mpo_data = self.inputs.mpo
         model_data = self.inputs.model
-        mpo = mpo_data.load_mpo(model_data)
+        MPO = mpo_data.load_mpo(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mpo_path = os.path.join(tmpdir, "mpo")
-            mpo.dump(mpo_path)
+            MPO.dump(mpo_path)
             actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mpo.npz", "wb") as dst:

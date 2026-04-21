@@ -9,10 +9,10 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import BasisTreeData, TTNSData, TtnoData
+from aiida_renormalizer.data import BasisTreeData, TTNSData, TTNOData
 
 
-class TtnsExpectationCalcJob(RenoBaseCalcJob):
+class TTNSExpectationCalcJob(RenoBaseCalcJob):
     """Compute expectation value <ttns|ttno|ttns>.
 
     Corresponds to Reno API: ttns.expectation(ttno)
@@ -20,7 +20,7 @@ class TtnsExpectationCalcJob(RenoBaseCalcJob):
     Inputs:
         basis_tree: BasisTreeData - Tree topology and basis
         ttns: TTNSData - TTN state
-        ttno: TtnoData - TTN operator
+        ttno: TTNOData - TTN operator
 
     Outputs:
         output_parameters: Dict - Expectation value
@@ -39,7 +39,7 @@ class TtnsExpectationCalcJob(RenoBaseCalcJob):
             help="Tree topology and basis grouping",
         )
         spec.input("ttns", valid_type=TTNSData, help="TTN state")
-        spec.input("ttno", valid_type=TtnoData, help="TTN operator")
+        spec.input("ttno", valid_type=TTNOData, help="TTN operator")
 
     def _write_input_files(self, folder) -> None:
         """Write input files."""
@@ -59,11 +59,11 @@ class TtnsExpectationCalcJob(RenoBaseCalcJob):
 
         # Write TTNS
         ttns_data = self.inputs.ttns
-        ttns = ttns_data.load_ttns(basis_tree_data)
+        TTNS_obj = ttns_data.load_ttns(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttns_path = os.path.join(tmpdir, "ttns")
-            ttns.dump(ttns_path)
+            TTNS_obj.dump(ttns_path)
             actual = ttns_path + ".npz" if os.path.exists(ttns_path + ".npz") else ttns_path
             with open(actual, "rb") as src:
                 with folder.open("initial_ttns.npz", "wb") as dst:
@@ -71,11 +71,11 @@ class TtnsExpectationCalcJob(RenoBaseCalcJob):
 
         # Write TTNO
         ttno_data = self.inputs.ttno
-        ttno = ttno_data.load_ttno(basis_tree_data)
+        TTNO_obj = ttno_data.load_ttno(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttno_path = os.path.join(tmpdir, "ttno")
-            ttno.dump(ttno_path)
+            TTNO_obj.dump(ttno_path)
             actual = ttno_path + ".npz" if os.path.exists(ttno_path + ".npz") else ttno_path
             with open(actual, "rb") as src:
                 with folder.open("initial_ttno.npz", "wb") as dst:
@@ -90,7 +90,7 @@ class TtnsExpectationCalcJob(RenoBaseCalcJob):
         ]
 
 
-class TtnsEntropyCalcJob(RenoBaseCalcJob):
+class TTNSEntropyCalcJob(RenoBaseCalcJob):
     """Compute von Neumann entropy at each node.
 
     Computes the entanglement entropy by partitioning the tree at each node.
@@ -135,11 +135,11 @@ class TtnsEntropyCalcJob(RenoBaseCalcJob):
 
         # Write TTNS
         ttns_data = self.inputs.ttns
-        ttns = ttns_data.load_ttns(basis_tree_data)
+        TTNS_obj = ttns_data.load_ttns(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttns_path = os.path.join(tmpdir, "ttns")
-            ttns.dump(ttns_path)
+            TTNS_obj.dump(ttns_path)
             actual = ttns_path + ".npz" if os.path.exists(ttns_path + ".npz") else ttns_path
             with open(actual, "rb") as src:
                 with folder.open("initial_ttns.npz", "wb") as dst:
@@ -154,7 +154,7 @@ class TtnsEntropyCalcJob(RenoBaseCalcJob):
         ]
 
 
-class TtnsMutualInfoCalcJob(RenoBaseCalcJob):
+class TTNSMutualInfoCalcJob(RenoBaseCalcJob):
     """Compute mutual information between nodes.
 
     Computes the mutual information between pairs of nodes in the tree.
@@ -199,11 +199,11 @@ class TtnsMutualInfoCalcJob(RenoBaseCalcJob):
 
         # Write TTNS
         ttns_data = self.inputs.ttns
-        ttns = ttns_data.load_ttns(basis_tree_data)
+        TTNS_obj = ttns_data.load_ttns(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttns_path = os.path.join(tmpdir, "ttns")
-            ttns.dump(ttns_path)
+            TTNS_obj.dump(ttns_path)
             actual = ttns_path + ".npz" if os.path.exists(ttns_path + ".npz") else ttns_path
             with open(actual, "rb") as src:
                 with folder.open("initial_ttns.npz", "wb") as dst:
@@ -218,7 +218,7 @@ class TtnsMutualInfoCalcJob(RenoBaseCalcJob):
         ]
 
 
-class TtnsRdmCalcJob(RenoBaseCalcJob):
+class TTNSRdmCalcJob(RenoBaseCalcJob):
     """Compute reduced density matrix for specific nodes.
 
     Inputs:
@@ -277,11 +277,11 @@ class TtnsRdmCalcJob(RenoBaseCalcJob):
 
         # Write TTNS
         ttns_data = self.inputs.ttns
-        ttns = ttns_data.load_ttns(basis_tree_data)
+        TTNS_obj = ttns_data.load_ttns(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttns_path = os.path.join(tmpdir, "ttns")
-            ttns.dump(ttns_path)
+            TTNS_obj.dump(ttns_path)
             actual = ttns_path + ".npz" if os.path.exists(ttns_path + ".npz") else ttns_path
             with open(actual, "rb") as src:
                 with folder.open("initial_ttns.npz", "wb") as dst:

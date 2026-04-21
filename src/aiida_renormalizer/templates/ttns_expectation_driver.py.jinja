@@ -1,4 +1,4 @@
-"""Driver script for TtnsExpectationCalcJob.
+"""Driver script for TTNSExpectationCalcJob.
 
 Compute expectation value <ttns|ttno|ttns>.
 """
@@ -43,18 +43,18 @@ def save_output_parameters(params, output_file='output_parameters.json'):
 if __name__ == '__main__':
     # Load inputs
     basis_tree = load_basis_tree()
-    ttns = load_ttns('initial_ttns.npz', basis_tree)
-    ttno = load_ttno('initial_ttno.npz', basis_tree)
+    TTNS = load_ttns('initial_ttns.npz', basis_tree)
+    TTNO = load_ttno('initial_ttno.npz', basis_tree)
 
     # Compute expectation value
-    expectation_value = ttns.expectation(ttno)
+    expectation_value = TTNS.expectation(TTNO)
 
     # Prepare output parameters
     output_params = {
-        'calcjob_class': 'TtnsExpectationCalcJob',
+        'calcjob_class': 'TTNSExpectationCalcJob',
         'calc_type': 'expectation',
         'expectation_value': float(expectation_value.real) if np.iscomplexobj(expectation_value) else float(expectation_value),
         'expectation_value_complex': [float(expectation_value.real), float(expectation_value.imag)] if np.iscomplexobj(expectation_value) else None,
-        'n_nodes': len(ttns),
+        'n_nodes': len(TTNS),
     }
     save_output_parameters(output_params)

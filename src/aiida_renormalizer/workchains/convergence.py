@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext, while_
 
 from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ConvergenceWorkChain(WorkChain):
@@ -24,15 +24,15 @@ class ConvergenceWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
-        initial_mps: MpsData (optional) - Initial guess
+        mpo: MPOData - Hamiltonian operator
+        initial_mps: MPSData (optional) - Initial guess
         m_values: List - List of bond dimensions to test
         convergence_threshold: Float - Energy convergence threshold
         config: ConfigData - DMRG configuration
         code: AbstractCode - Code to use
 
     Outputs:
-        converged_mps: MpsData - MPS at converged bond dimension
+        converged_mps: MPSData - MPS at converged bond dimension
         convergence_data: Dict - Energy and observables vs bond dimension
         optimal_m: Int - Optimal (converged) bond dimension
         output_parameters: Dict - Convergence statistics
@@ -45,10 +45,10 @@ class ConvergenceWorkChain(WorkChain):
 
         # Inputs
         spec.input("model", valid_type=ModelData, help="System definition")
-        spec.input("mpo", valid_type=MpoData, help="Hamiltonian MPO")
+        spec.input("mpo", valid_type=MPOData, help="Hamiltonian MPO")
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS guess",
         )
@@ -73,7 +73,7 @@ class ConvergenceWorkChain(WorkChain):
         )
 
         # Outputs
-        spec.output("converged_mps", valid_type=MpsData, help="MPS at converged bond dimension")
+        spec.output("converged_mps", valid_type=MPSData, help="MPS at converged bond dimension")
         spec.output("convergence_data", valid_type=orm.Dict, help="Convergence data")
         spec.output("optimal_m", valid_type=orm.Int, help="Optimal bond dimension")
         spec.output("output_parameters", valid_type=orm.Dict, help="Convergence statistics")

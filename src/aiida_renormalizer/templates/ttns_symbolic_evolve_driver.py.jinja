@@ -73,21 +73,21 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unsupported tree_type: {tree_type}")
 
-    ttno = TTNO(basis_tree, ham_terms)
-    ttns = TTNS.random(basis_tree, qntot=0, m_max=m_max)
-    ttns.evolve_config = EvolveConfig(method=getattr(EvolveMethod, method_name))
+    TTNO = TTNO(basis_tree, ham_terms)
+    TTNS = TTNS.random(basis_tree, qntot=0, m_max=m_max)
+    TTNS.evolve_config = EvolveConfig(method=getattr(EvolveMethod, method_name))
 
-    energies = [float(ttns.expectation(ttno))]
+    energies = [float(TTNS.expectation(TTNO))]
     times = [0.0]
 
     for i in range(nsteps):
-        ttns = ttns.evolve(ttno, dt, normalize=True)
-        energies.append(float(ttns.expectation(ttno)))
+        TTNS = TTNS.evolve(TTNO, dt, normalize=True)
+        energies.append(float(TTNS.expectation(TTNO)))
         times.append((i + 1) * dt)
 
     save_output_parameters(
         {
-            "calcjob_class": "TtnsSymbolicEvolveCalcJob",
+            "calcjob_class": "TTNSSymbolicEvolveCalcJob",
             "calc_type": "time_evolution",
             "tree_type": tree_type,
             "method": method_name,
@@ -97,13 +97,13 @@ if __name__ == "__main__":
             "energy_trajectory": energies,
             "initial_energy": energies[0],
             "final_energy": energies[-1],
-            "bond_dims": [int(d) for d in ttns.bond_dims],
-            "n_nodes": len(ttns),
+            "bond_dims": [int(d) for d in TTNS.bond_dims],
+            "n_nodes": len(TTNS),
             "converged": True,
         }
     )
 
-    save_ttns(ttns, "output_ttns.npz", f"TTNS symbolic evolved, final E={energies[-1]:.10f}")
+    save_ttns(TTNS, "output_ttns.npz", f"TTNS symbolic evolved, final E={energies[-1]:.10f}")
 
     np.savez(
         "trajectory.npz",

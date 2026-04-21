@@ -9,14 +9,15 @@ The plugin provides AiiDA-native building blocks for common tensor-network workl
 - AiiDA data nodes for models, operators, basis sets, MPOs, MPSs, TTNOs, and TTNSs
 - CalcJobs for DMRG, TDVP, spectra, transport, and TTN operations
 - WorkChains for multi-step workflows such as ground-state search, time evolution, convergence studies, and spectroscopy
-- `verdi reno ...` commands for day-to-day usage
 
 The intended user-facing interfaces are:
 
 - AiiDA Python API
-- `verdi` CLI
+- `verdi run ...` (script submission)
 
 The intended interface is not “write custom Renormalizer scripts in the README”. Renormalizer remains a runtime dependency of the plugin, but it should stay behind the plugin boundary in normal usage.
+
+Temporary status: the Python LEGO API is under rapid development, and documentation is still being written. Verdi CLI: TODO.
 
 ## Storage Model
 
@@ -177,97 +178,12 @@ print("Final state:", result["final_mps"].pk)
 Use the symbolic TTNS TDVP-PS example when you want setup and runtime construction to stay separated.
 
 ```bash
-# one-shot
 verdi run examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py
-
-# multi-step verdi flow
-bash examples/ttn/sbm_ttns_tdvp_ps/run_via_verdi.sh
 ```
 
 The example uses `reno.ttns_symbolic_evolve` and stores artifacts under `<repo>/tmp` by default.
 
-## `verdi` Quickstart
-
-### Ground state
-
-```bash
-verdi reno ground-state \
-  -m model.toml \
-  -b basis.toml \
-  -C renormalizer@localhost \
-  --artifact-storage-base /data/reno-artifacts
-```
-
-Minimal `basis.toml`:
-
-```toml
-[[basis]]
-type = "BasisHalfSpin"
-dof = "spin"
-
-[basis.params]
-sigmaqn = [0, 0]
-
-[[basis]]
-type = "BasisSHO"
-dof = "v0"
-
-[basis.params]
-omega = 1.0
-nbas = 6
-```
-
-Minimal `model.toml`:
-
-```toml
-[[hamiltonian]]
-symbol = "sigma_x"
-dofs = "spin"
-factor = 0.4
-
-[[hamiltonian]]
-symbol = "sigma_z"
-dofs = "spin"
-factor = 0.05
-
-[[hamiltonian]]
-symbol = "b^\\dagger b"
-dofs = "v0"
-factor = 1.0
-
-[[hamiltonian]]
-symbol = "sigma_z x"
-dofs = ["spin", "v0"]
-factor = 0.08
-```
-
-Ready-to-copy files are included at:
-
-- `examples/cli_inputs/basis.toml`
-- `examples/cli_inputs/model.toml`
-
-### Time evolution
-
-```bash
-verdi reno evolve \
-  -s 123 \
-  -H 456 \
-  -t 100.0 \
-  --artifact-storage-base /data/reno-artifacts
-```
-
-### Spectrum
-
-```bash
-verdi reno spectrum \
-  -s 123 \
-  -H 456 \
-  -o a_dag \
-  -m spectra_zero_t \
-  --publication-bundle ./paper-bundle
-```
-
-## Publication Bundles
+## Publication Bundles (Design Note)
 
 Publication-oriented export is part of the storage design.
 
@@ -275,17 +191,7 @@ Publication-oriented export is part of the storage design.
 - a publication step can gather them into a bundle directory
 - the bundle includes a stable artifact filename, machine-readable metadata, and a short human-readable README
 
-Export a node-backed artifact into a publication bundle:
-
-```bash
-verdi reno bundle -n 123 -o ./paper-bundle
-```
-
-Optionally relink the node so future access resolves against the new bundle:
-
-```bash
-verdi reno bundle -n 123 -o ./paper-bundle --relink
-```
+The previous `verdi reno bundle ...` command path is currently disabled together with the CLI entrypoint and will return in a later phase.
 
 The exported directory is organized like this:
 
@@ -314,7 +220,7 @@ The repository currently contains:
 - data-layer types for MPS/MPO/TTNS/TTNO/model/basis/config
 - composite calculations and parsers
 - workchains for ground state, time evolution, spectroscopy, transport, and TTN workflows
-- CLI commands under `verdi reno`
+- spec-driven examples under `examples/`
 
 ## Tests
 
@@ -336,6 +242,7 @@ uv run python -m pytest -q tests
 
 - The plugin drivers target current Renormalizer public APIs (`renormalizer.utils.configs`), not legacy `renormalizer.parameter`.
 - For AiiDA 2.7.3 environments, use `verdi run ...` for script-style launches.
+- The custom `verdi reno ...` CLI entrypoint is temporarily disabled during API refactor.
 - Some advanced Renormalizer branches are upstream-limited and may raise `NotImplementedError` depending on model/configuration (for example complex Kubo coupling paths).
 
 ## License

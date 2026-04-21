@@ -16,7 +16,7 @@ class BathSpinBosonModelWorkChain(WorkChain):
     - `param2mollist` for the canonical ohmic/debye-style construction path
     - explicit `(omega_k, c_j2)` inputs for already-discretized bath modes
 
-    The resulting `bath_model` node can be passed directly to `BuildMpoCalcJob`
+    The resulting `bath_model` node can be passed directly to `BuildMPOCalcJob`
     or any other consumer that expects `ModelData`.
     """
 

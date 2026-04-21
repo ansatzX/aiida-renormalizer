@@ -1,4 +1,4 @@
-"""TtnoData node for Renormalizer TTNO persistence."""
+"""TTNOData node for Renormalizer TTNO persistence."""
 from __future__ import annotations
 
 import tempfile
@@ -20,20 +20,20 @@ from aiida_renormalizer.data.artifacts import (
 from aiida_renormalizer.data.utils import get_linked_node, write_json_to_repository
 
 
-class TtnoData(Data):
+class TTNOData(Data):
     """AiiDA Data node storing a Renormalizer TTNO (Tree Tensor Network Operator)."""
 
     @classmethod
     def from_ttno(
         cls,
-        ttno: TTNO,
+        ttno_obj: TTNO,
         basis_tree_data: BasisTreeData,
         *,
         storage_backend: str = "posix",
         storage_base: str | None = None,
         relative_path: str | None = None,
-    ) -> TtnoData:
-        """Create a TtnoData node from a Reno TTNO."""
+    ) -> TTNOData:
+        """Create a TTNOData node from a Reno TTNO."""
         node = cls()
         if storage_base is None:
             storage_base = str(tempfile.gettempdir())
@@ -41,16 +41,16 @@ class TtnoData(Data):
             relative_path = f"aiida-renormalizer/ttno/{node.uuid}.npz"
 
         # Attributes
-        node.base.attributes.set("n_nodes", len(ttno))
-        node.base.attributes.set("bond_dims", [int(d) for d in ttno.bond_dims])
+        node.base.attributes.set("n_nodes", len(ttno_obj))
+        node.base.attributes.set("bond_dims", [int(d) for d in ttno_obj.bond_dims])
         node.base.attributes.set(
             "dtype",
-            str(np.result_type(*(nd.tensor.dtype for nd in ttno.node_list))),
+            str(np.result_type(*(nd.tensor.dtype for nd in ttno_obj.node_list))),
         )
         node.base.attributes.set("basis_tree_data_uuid", str(basis_tree_data.uuid))
 
         artifact = write_external_artifact(
-            ttno,
+            ttno_obj,
             storage_backend=storage_backend,
             storage_base=storage_base,
             relative_path=relative_path,
@@ -109,7 +109,7 @@ class TtnoData(Data):
             basis_tree_data = self.basis_tree_data
         basis_tree = basis_tree_data.load_basis_tree()
 
-        from renormalizer.tn.tree import TTNO as RenoTTNO, TTNBase
+        from renormalizer.tn.tree import TTNO, TTNBase
 
         artifact_path = resolve_artifact_path(
             self.artifact_metadata["storage_backend"],
@@ -120,13 +120,13 @@ class TtnoData(Data):
             raise FileNotFoundError(f"TTNO artifact not found: {artifact_path}")
 
         # Load via TTNBase.load to avoid TTNO.__init__ requiring terms
-        ttno = TTNBase.load(basis_tree, str(artifact_path), other_attrs=[])
+        ttno_loaded = TTNBase.load(basis_tree, str(artifact_path), other_attrs=[])
 
         # Patch class and terms so the object behaves like a proper TTNO
-        ttno.__class__ = RenoTTNO
-        ttno.terms = []
+        ttno_loaded.__class__ = TTNO
+        ttno_loaded.terms = []
 
-        return ttno
+        return ttno_loaded
 
     def relink_artifact(self, storage_base: str, relative_path: str) -> None:
         """Update the logical artifact location."""

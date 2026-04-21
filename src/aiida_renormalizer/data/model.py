@@ -18,10 +18,47 @@ class ModelData(Data):
     """AiiDA Data node storing a complete Renormalizer Model (basis + Hamiltonian + dipole)."""
 
     @classmethod
+    def from_symbolic_spec(
+        cls,
+        *,
+        basis: list[dict[str, t.Any]],
+        hamiltonian: list[dict[str, t.Any]],
+        dipole: list[dict[str, t.Any]] | None = None,
+    ) -> ModelData:
+        """Create ModelData from symbolic basis/hamiltonian spec dicts.
+
+        Supported basis items:
+        - {"kind": "half_spin", "dof": str, "sigmaqn": [int, int]}
+        - {"kind": "sho", "dof": str, "omega": float, "nbas": int}
+
+        Hamiltonian/dipole terms:
+        - {"symbol": str, "dofs": str | list[str], "factor": float}
+        """
+        from renormalizer.model import BasisHalfSpin, BasisSHO, Op
+        from renormalizer.model import Model as RenoModel
+
+        basis_items = []
+        for item in basis:
+            kind = str(item.get("kind", ""))
+            if kind == "half_spin":
+                basis_items.append(BasisHalfSpin(item["dof"], item.get("sigmaqn", [0, 0])))
+            elif kind == "sho":
+                basis_items.append(BasisSHO(item["dof"], item["omega"], int(item["nbas"])))
+            else:
+                raise ValueError(f"Unsupported basis kind: {kind}")
+
+        ham_terms = [Op(t["symbol"], t["dofs"], t.get("factor", 1.0)) for t in hamiltonian]
+        dipole_terms = None
+        if dipole:
+            dipole_terms = [Op(t["symbol"], t["dofs"], t.get("factor", 1.0)) for t in dipole]
+
+        return cls.from_model(RenoModel(basis_items, ham_terms, dipole=dipole_terms))
+
+    @classmethod
     def from_model(cls, model: Model) -> ModelData:
         """Create a ModelData node from a Reno Model."""
         from aiida_renormalizer.data.basis_registry import serialize_basis
-        from aiida_renormalizer.data.op import serialize_op, serialize_opsum
+        from aiida_renormalizer.data.op import serialize_opsum
 
         node = cls()
 

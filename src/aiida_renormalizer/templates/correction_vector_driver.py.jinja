@@ -90,9 +90,9 @@ if __name__ == '__main__':
 
     # Load initial MPS (if provided)
     {% if has_initial_mps %}
-    initial_mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
     {% else %}
-    initial_mps = None
+    MPS = None
     {% endif %}
 
     # Create correction vector calculator

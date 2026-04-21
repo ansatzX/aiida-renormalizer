@@ -10,7 +10,7 @@ from aiida_renormalizer.calculations.base import RenoBaseCalcJob
 from aiida_renormalizer.data import BasisTreeData, TTNSData
 
 
-class TtnsSymbolicEvolveCalcJob(RenoBaseCalcJob):
+class TTNSSymbolicEvolveCalcJob(RenoBaseCalcJob):
     """TTNS evolution from symbolic inputs.
 
     This CalcJob separates:

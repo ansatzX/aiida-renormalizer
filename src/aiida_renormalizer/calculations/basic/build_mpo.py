@@ -5,10 +5,10 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpoData, OpData
+from aiida_renormalizer.data import ModelData, MPOData, OpData
 
 
-class BuildMpoCalcJob(RenoBaseCalcJob):
+class BuildMPOCalcJob(RenoBaseCalcJob):
     """Build an MPO from a symbolic operator (Op or OpSum).
 
     Corresponds to Reno API: Mpo(model, op) from OpData
@@ -24,7 +24,7 @@ class BuildMpoCalcJob(RenoBaseCalcJob):
         spec.input('op', valid_type=OpData, help='Symbolic operator to convert to MPO')
 
         # Outputs
-        spec.output('output_mpo', valid_type=MpoData, help='Constructed MPO')
+        spec.output('output_mpo', valid_type=MPOData, help='Constructed MPO')
 
     def _write_input_files(self, folder) -> None:
         """Write op.json for driver.py."""

@@ -1,21 +1,21 @@
-"""Unit tests for TtnMpsComparisonWorkChain."""
+"""Unit tests for TTNMPSComparisonWorkChain."""
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
 from aiida import orm
 
-from aiida_renormalizer.workchains.ttn_mps_comparison import TtnMpsComparisonWorkChain
+from aiida_renormalizer.workchains.ttn_mps_comparison import TTNMPSComparisonWorkChain
 from tests.workchains.conftest import make_workchain, Namespace
 
 
 def test_ttn_mps_comparison_setup():
     """Test setup method."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.inputs = Namespace(calculation_type=orm.Str("ground_state"))
 
     # Setup
-    result = TtnMpsComparisonWorkChain.setup(wc)
+    result = TTNMPSComparisonWorkChain.setup(wc)
 
     # Check initialization
     assert result is None
@@ -23,21 +23,21 @@ def test_ttn_mps_comparison_setup():
 
 def test_ttn_mps_comparison_setup_unsupported():
     """Test setup with unsupported calculation type."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.inputs = Namespace(calculation_type=orm.Str("invalid"))
-    wc.exit_codes = TtnMpsComparisonWorkChain.exit_codes
+    wc.exit_codes = TTNMPSComparisonWorkChain.exit_codes
 
     # Setup
-    result = TtnMpsComparisonWorkChain.setup(wc)
+    result = TTNMPSComparisonWorkChain.setup(wc)
 
     # Should return error
-    assert result == TtnMpsComparisonWorkChain.exit_codes.ERROR_UNSUPPORTED_CALCULATION
+    assert result == TTNMPSComparisonWorkChain.exit_codes.ERROR_UNSUPPORTED_CALCULATION
 
 
 def test_ttn_mps_comparison_run_mps():
     """Test run_mps method."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     # Use Namespace so ``"key" in self.inputs`` works
     wc.inputs = Namespace(
@@ -48,7 +48,7 @@ def test_ttn_mps_comparison_run_mps():
     )
 
     # Run MPS -- self.submit is already mocked by make_workchain
-    result = TtnMpsComparisonWorkChain.run_mps(wc)
+    result = TTNMPSComparisonWorkChain.run_mps(wc)
 
     assert wc.submit.called
     assert result is not None
@@ -56,7 +56,7 @@ def test_ttn_mps_comparison_run_mps():
 
 def test_ttn_mps_comparison_inspect_mps_success():
     """Test inspect_mps with successful calculation."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     # Mock successful calculation
     calc = Mock()
@@ -79,7 +79,7 @@ def test_ttn_mps_comparison_inspect_mps_success():
     wc.ctx.mps_calc = calc
 
     # Inspect
-    result = TtnMpsComparisonWorkChain.inspect_mps(wc)
+    result = TTNMPSComparisonWorkChain.inspect_mps(wc)
 
     # Check results
     assert result is None  # No error
@@ -89,7 +89,7 @@ def test_ttn_mps_comparison_inspect_mps_success():
 
 def test_ttn_mps_comparison_inspect_mps_failure():
     """Test inspect_mps with failed calculation."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     calc = Mock()
     calc.is_finished_ok = False
@@ -99,16 +99,16 @@ def test_ttn_mps_comparison_inspect_mps_failure():
 
     wc.ctx = Namespace()
     wc.ctx.mps_calc = calc
-    wc.exit_codes = TtnMpsComparisonWorkChain.exit_codes
+    wc.exit_codes = TTNMPSComparisonWorkChain.exit_codes
 
-    result = TtnMpsComparisonWorkChain.inspect_mps(wc)
+    result = TTNMPSComparisonWorkChain.inspect_mps(wc)
 
-    assert result == TtnMpsComparisonWorkChain.exit_codes.ERROR_MPS_FAILED
+    assert result == TTNMPSComparisonWorkChain.exit_codes.ERROR_MPS_FAILED
 
 
 def test_ttn_mps_comparison_run_ttn():
     """Test run_ttn method."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     # Use Namespace so ``"key" in self.inputs`` works
     wc.inputs = Namespace(
@@ -119,7 +119,7 @@ def test_ttn_mps_comparison_run_ttn():
     )
 
     # Run TTN -- self.submit is already mocked by make_workchain
-    result = TtnMpsComparisonWorkChain.run_ttn(wc)
+    result = TTNMPSComparisonWorkChain.run_ttn(wc)
 
     assert wc.submit.called
     assert result is not None
@@ -127,7 +127,7 @@ def test_ttn_mps_comparison_run_ttn():
 
 def test_ttn_mps_comparison_inspect_ttn_success():
     """Test inspect_ttn with successful calculation."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     # Mock successful calculation
     calc = Mock()
@@ -150,7 +150,7 @@ def test_ttn_mps_comparison_inspect_ttn_success():
     wc.ctx.ttn_calc = calc
 
     # Inspect
-    result = TtnMpsComparisonWorkChain.inspect_ttn(wc)
+    result = TTNMPSComparisonWorkChain.inspect_ttn(wc)
 
     # Check results
     assert result is None
@@ -160,7 +160,7 @@ def test_ttn_mps_comparison_inspect_ttn_success():
 
 def test_ttn_mps_comparison_inspect_ttn_failure():
     """Test inspect_ttn with failed calculation."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     calc = Mock()
     calc.is_finished_ok = False
@@ -170,16 +170,16 @@ def test_ttn_mps_comparison_inspect_ttn_failure():
 
     wc.ctx = Namespace()
     wc.ctx.ttn_calc = calc
-    wc.exit_codes = TtnMpsComparisonWorkChain.exit_codes
+    wc.exit_codes = TTNMPSComparisonWorkChain.exit_codes
 
-    result = TtnMpsComparisonWorkChain.inspect_ttn(wc)
+    result = TTNMPSComparisonWorkChain.inspect_ttn(wc)
 
-    assert result == TtnMpsComparisonWorkChain.exit_codes.ERROR_TTN_FAILED
+    assert result == TTNMPSComparisonWorkChain.exit_codes.ERROR_TTN_FAILED
 
 
 def test_ttn_mps_comparison_compare_results():
     """Test compare_results method."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.ctx = Namespace()
     wc.ctx.mps_energy = -1.5
@@ -188,7 +188,7 @@ def test_ttn_mps_comparison_compare_results():
     wc.ctx.ttn_params = {"bond_dims": [10, 15, 20], "iterations": 8}
 
     # Compare
-    TtnMpsComparisonWorkChain.compare_results(wc)
+    TTNMPSComparisonWorkChain.compare_results(wc)
 
     # Check comparison data
     assert wc.ctx.comparison["mps_energy"] == -1.5
@@ -200,7 +200,7 @@ def test_ttn_mps_comparison_compare_results():
 
 def test_ttn_mps_comparison_finalize():
     """Test finalize method."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.inputs = Namespace(calculation_type=orm.Str("ground_state"))
 
@@ -214,7 +214,7 @@ def test_ttn_mps_comparison_finalize():
     }
 
     # Finalize
-    TtnMpsComparisonWorkChain.finalize(wc)
+    TTNMPSComparisonWorkChain.finalize(wc)
 
     # Check outputs
     assert wc.out.call_count >= 4  # mps_result, ttn_result, comparison_data, output_parameters
@@ -222,7 +222,7 @@ def test_ttn_mps_comparison_finalize():
 
 def test_ttn_mps_comparison_with_initial_states():
     """Test that initial states are passed when provided."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.inputs = Namespace(
         model=Mock(),
@@ -236,7 +236,7 @@ def test_ttn_mps_comparison_with_initial_states():
     )
 
     # Run MPS submission
-    TtnMpsComparisonWorkChain.run_mps(wc)
+    TTNMPSComparisonWorkChain.run_mps(wc)
 
     # Check that initial_mps was passed in submit kwargs
     assert wc.submit.called
@@ -246,7 +246,7 @@ def test_ttn_mps_comparison_with_initial_states():
 
 def test_ttn_mps_comparison_energy_difference_calculation():
     """Test that energy difference is calculated correctly."""
-    wc = make_workchain(TtnMpsComparisonWorkChain)
+    wc = make_workchain(TTNMPSComparisonWorkChain)
 
     wc.ctx = Namespace()
     wc.ctx.mps_energy = -2.0
@@ -254,7 +254,7 @@ def test_ttn_mps_comparison_energy_difference_calculation():
     wc.ctx.mps_params = {}
     wc.ctx.ttn_params = {}
 
-    TtnMpsComparisonWorkChain.compare_results(wc)
+    TTNMPSComparisonWorkChain.compare_results(wc)
 
     # Check energy difference
     assert abs(wc.ctx.comparison["energy_difference"] - 0.1) < 1e-10

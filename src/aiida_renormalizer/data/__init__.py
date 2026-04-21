@@ -5,10 +5,10 @@ __all__ = [
     "BasisTreeData",
     "ConfigData",
     "ModelData",
-    "MpoData",
-    "MpsData",
+    "MPOData",
+    "MPSData",
     "OpData",
-    "TtnoData",
+    "TTNOData",
     "TTNSData",
 ]
 
@@ -31,22 +31,22 @@ def __getattr__(name: str):
         from aiida_renormalizer.data.model import ModelData
 
         return ModelData
-    if name == "MpoData":
-        from aiida_renormalizer.data.mpo import MpoData
+    if name == "MPOData":
+        from aiida_renormalizer.data.mpo import MPOData
 
-        return MpoData
-    if name == "MpsData":
-        from aiida_renormalizer.data.mps import MpsData
+        return MPOData
+    if name == "MPSData":
+        from aiida_renormalizer.data.mps import MPSData
 
-        return MpsData
+        return MPSData
     if name == "OpData":
         from aiida_renormalizer.data.op import OpData
 
         return OpData
-    if name == "TtnoData":
-        from aiida_renormalizer.data.ttno import TtnoData
+    if name == "TTNOData":
+        from aiida_renormalizer.data.ttno import TTNOData
 
-        return TtnoData
+        return TTNOData
     if name == "TTNSData":
         from aiida_renormalizer.data.ttns import TTNSData
 

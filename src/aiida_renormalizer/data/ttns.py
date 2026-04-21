@@ -25,7 +25,7 @@ class TTNSData(Data):
     @classmethod
     def from_ttns(
         cls,
-        ttns: TTNS,
+        ttns_obj: TTNS,
         basis_tree_data: BasisTreeData,
         *,
         storage_backend: str,
@@ -36,21 +36,21 @@ class TTNSData(Data):
         node = cls()
 
         # Attributes
-        node.base.attributes.set("n_nodes", len(ttns))
-        node.base.attributes.set("bond_dims", [int(d) for d in ttns.bond_dims])
+        node.base.attributes.set("n_nodes", len(ttns_obj))
+        node.base.attributes.set("bond_dims", [int(d) for d in ttns_obj.bond_dims])
         node.base.attributes.set(
             "qntot",
-            ttns.qntot.tolist() if isinstance(ttns.qntot, np.ndarray) else ttns.qntot,
+            ttns_obj.qntot.tolist() if isinstance(ttns_obj.qntot, np.ndarray) else ttns_obj.qntot,
         )
         node.base.attributes.set(
             "dtype",
-            str(np.result_type(*(nd.tensor.dtype for nd in ttns.node_list))),
+            str(np.result_type(*(nd.tensor.dtype for nd in ttns_obj.node_list))),
         )
         node.base.attributes.set("basis_tree_data_uuid", str(basis_tree_data.uuid))
-        node.base.attributes.set("coeff", float(ttns.coeff))
+        node.base.attributes.set("coeff", float(ttns_obj.coeff))
 
         artifact = write_external_artifact(
-            ttns,
+            ttns_obj,
             storage_backend=storage_backend,
             storage_base=storage_base,
             relative_path=relative_path,
@@ -110,7 +110,7 @@ class TTNSData(Data):
             basis_tree_data = self.basis_tree_data
         basis_tree = basis_tree_data.load_basis_tree()
 
-        from renormalizer.tn.tree import TTNS as RenoTTNS
+        from renormalizer.tn.tree import TTNS
 
         artifact_path = resolve_artifact_path(
             self.artifact_metadata["storage_backend"],
@@ -120,12 +120,12 @@ class TTNSData(Data):
         if not artifact_path.exists():
             raise FileNotFoundError(f"TTNS artifact not found: {artifact_path}")
 
-        ttns = RenoTTNS.load(basis_tree, str(artifact_path))
+        ttns_loaded = TTNS.load(basis_tree, str(artifact_path))
 
         # Restore coefficient
-        ttns.coeff = self.base.attributes.get("coeff")
+        ttns_loaded.coeff = self.base.attributes.get("coeff")
 
-        return ttns
+        return ttns_loaded
 
     def relink_artifact(self, storage_base: str, relative_path: str) -> None:
         """Update the logical artifact location."""

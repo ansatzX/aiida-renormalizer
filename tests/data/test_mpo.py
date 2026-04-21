@@ -1,4 +1,4 @@
-"""Tests for MpoData."""
+"""Tests for MPOData."""
 from __future__ import annotations
 
 import hashlib
@@ -7,16 +7,16 @@ import numpy as np
 import pytest
 
 
-class TestMpoData:
+class TestMPOData:
     def test_roundtrip_external_artifact(self, aiida_profile, sho_model, sho_mpo, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mpo import MpoData
+        from aiida_renormalizer.data.mpo import MPOData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
         artifact_base = tmp_path / "mpo-artifacts"
-        mpo_node = MpoData.from_mpo(
+        mpo_node = MPOData.from_mpo(
             sho_mpo,
             model_node,
             storage_backend="posix",
@@ -37,12 +37,12 @@ class TestMpoData:
 
     def test_expectation_consistency(self, aiida_profile, sho_model, sho_mps, sho_mpo, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mpo import MpoData
+        from aiida_renormalizer.data.mpo import MPOData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
-        mpo_node = MpoData.from_mpo(
+        mpo_node = MPOData.from_mpo(
             sho_mpo,
             model_node,
             storage_backend="posix",
@@ -58,12 +58,12 @@ class TestMpoData:
 
     def test_missing_external_artifact_raises(self, aiida_profile, sho_model, sho_mpo, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mpo import MpoData
+        from aiida_renormalizer.data.mpo import MPOData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
-        mpo_node = MpoData.from_mpo(
+        mpo_node = MPOData.from_mpo(
             sho_mpo,
             model_node,
             storage_backend="posix",

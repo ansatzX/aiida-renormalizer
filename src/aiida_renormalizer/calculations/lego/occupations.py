@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData
+from aiida_renormalizer.data import ModelData, MPSData
 
 
 class ComputeOccupationsCalcJob(RenoBaseCalcJob):
@@ -25,7 +25,7 @@ class ComputeOccupationsCalcJob(RenoBaseCalcJob):
         super().define(spec)
 
         # Additional inputs
-        spec.input('mps', valid_type=MpsData, help='MPS state')
+        spec.input('mps', valid_type=MPSData, help='MPS state')
         spec.input('dof_type', valid_type=orm.Str, default=lambda: orm.Str('all'),
                    help='Which DOFs to compute: "all", "electronic", "phonon"')
 
@@ -44,11 +44,11 @@ class ComputeOccupationsCalcJob(RenoBaseCalcJob):
         # Write MPS
         mps_data = self.inputs.mps
         model_data = self.inputs.model
-        mps = mps_data.load_mps(model_data)
+        MPS = mps_data.load_mps(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mps_path = os.path.join(tmpdir, 'mps')
-            mps.dump(mps_path)
+            MPS.dump(mps_path)
             actual = mps_path + '.npz' if os.path.exists(mps_path + '.npz') else mps_path
             with open(actual, 'rb') as src:
                 with folder.open('initial_mps.npz', 'wb') as dst:

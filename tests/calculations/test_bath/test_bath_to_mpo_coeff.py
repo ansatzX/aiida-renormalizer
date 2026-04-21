@@ -1,10 +1,10 @@
-"""Tests for BathToMpoCoeffCalcJob."""
+"""Tests for BathToMPOCoeffCalcJob."""
 import numpy as np
 import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.calculations.bath.bath_to_mpo_coeff import BathToMpoCoeffCalcJob
+from aiida_renormalizer.calculations.bath.bath_to_mpo_coeff import BathToMPOCoeffCalcJob
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -31,7 +31,7 @@ def c_j2():
 
 @pytest.fixture
 def generate_inputs(fixture_model_data, fixture_code, omega_k, c_j2):
-    """Generate minimal inputs for BathToMpoCoeffCalcJob."""
+    """Generate minimal inputs for BathToMPOCoeffCalcJob."""
     inputs = AttributeDict()
     inputs.model = fixture_model_data
     inputs.code = fixture_code
@@ -46,11 +46,11 @@ def generate_inputs(fixture_model_data, fixture_code, omega_k, c_j2):
 
 
 def test_bath_to_mpo_coeff_definition():
-    """Test BathToMpoCoeffCalcJob process definition."""
+    """Test BathToMPOCoeffCalcJob process definition."""
     from aiida.engine import CalcJobProcessSpec
 
     spec = CalcJobProcessSpec()
-    BathToMpoCoeffCalcJob.define(spec)
+    BathToMPOCoeffCalcJob.define(spec)
 
     assert "model" in spec.inputs
     assert "code" in spec.inputs
@@ -61,7 +61,7 @@ def test_bath_to_mpo_coeff_definition():
 
 def test_bath_to_mpo_coeff_template_context():
     """Test template context generation."""
-    calc = _make_calcjob(BathToMpoCoeffCalcJob, {
+    calc = _make_calcjob(BathToMPOCoeffCalcJob, {
         "frequency_scale": orm.Float(1.0),
         "coupling_scale": orm.Float(1.0),
     })
@@ -72,7 +72,7 @@ def test_bath_to_mpo_coeff_template_context():
 
 def test_bath_to_mpo_coeff_retrieve_list():
     """Test that retrieve list doesn't include output_mps.npz."""
-    calc = _make_calcjob(BathToMpoCoeffCalcJob, {})
+    calc = _make_calcjob(BathToMPOCoeffCalcJob, {})
     retrieve_list = calc._get_retrieve_list()
     assert "output_mps.npz" not in retrieve_list
     assert "output_parameters.json" in retrieve_list
@@ -83,5 +83,5 @@ def test_bath_to_mpo_coeff_entry_point():
     from aiida.plugins import CalculationFactory
 
     calc_class = CalculationFactory("reno.bath_to_mpo_coeff")
-    assert calc_class is BathToMpoCoeffCalcJob
+    assert calc_class is BathToMPOCoeffCalcJob
 

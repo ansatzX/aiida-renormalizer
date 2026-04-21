@@ -1,4 +1,4 @@
-"""Tests for TTN data nodes (BasisTreeData, TTNSData, TtnoData)."""
+"""Tests for TTN data nodes (BasisTreeData, TTNSData, TTNOData)."""
 from __future__ import annotations
 
 import hashlib
@@ -38,14 +38,14 @@ class TestTTNSData:
         from aiida_renormalizer.data.ttns import TTNSData
 
         basis_tree = BasisTree.binary(sho_basis)
-        ttns = TTNS.random(basis_tree, qntot=0, m_max=10)
+        TTNS = TTNS.random(basis_tree, qntot=0, m_max=10)
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
 
         artifact_base = tmp_path / "ttns-artifacts"
         ttns_node = TTNSData.from_ttns(
-            ttns,
+            TTNS,
             basis_tree_node,
             storage_backend="posix",
             storage_base=str(artifact_base),
@@ -61,11 +61,11 @@ class TestTTNSData:
             artifact_path.read_bytes()
         ).hexdigest()
 
-        restored = ttns_node.load_ttns()
-        assert len(restored) == len(ttns)
-        assert list(restored.bond_dims) == list(ttns.bond_dims)
-        assert np.allclose(restored.qntot, ttns.qntot)
-        assert restored.coeff == ttns.coeff
+        restored_TTNS = ttns_node.load_ttns()
+        assert len(restored_TTNS) == len(TTNS)
+        assert list(restored_TTNS.bond_dims) == list(TTNS.bond_dims)
+        assert np.allclose(restored_TTNS.qntot, TTNS.qntot)
+        assert restored_TTNS.coeff == TTNS.coeff
 
     def test_roundtrip_preserves_expectation(self, aiida_profile, sho_basis, tmp_path):
         from renormalizer import Op
@@ -74,21 +74,21 @@ class TestTTNSData:
         from renormalizer.tn.treebase import BasisTree
 
         from aiida_renormalizer.data.basis_tree import BasisTreeData
-        from aiida_renormalizer.data.ttno import TtnoData
+        from aiida_renormalizer.data.ttno import TTNOData
         from aiida_renormalizer.data.ttns import TTNSData
 
         basis_tree = BasisTree.binary(sho_basis)
-        ttns = TTNS.random(basis_tree, qntot=0, m_max=10)
+        TTNS = TTNS.random(basis_tree, qntot=0, m_max=10)
         ham_terms = OpSum([Op("b^\\dagger b", "v0", 1.0), Op("b^\\dagger b", "v1", 1.5)])
-        ttno = TTNO(basis_tree, ham_terms)
+        TTNO = TTNO(basis_tree, ham_terms)
 
-        e_orig = ttns.expectation(ttno)
+        e_orig = TTNS.expectation(TTNO)
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
 
         ttns_node = TTNSData.from_ttns(
-            ttns,
+            TTNS,
             basis_tree_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "archive"),
@@ -96,13 +96,13 @@ class TestTTNSData:
         )
         ttns_node.store()
 
-        ttno_node = TtnoData.from_ttno(ttno, basis_tree_node)
+        ttno_node = TTNOData.from_ttno(TTNO, basis_tree_node)
         ttno_node.store()
 
-        restored_ttns = ttns_node.load_ttns()
-        restored_ttno = ttno_node.load_ttno()
+        restored_TTNS = ttns_node.load_ttns()
+        restored_TTNO = ttno_node.load_ttno()
 
-        e_restored = restored_ttns.expectation(restored_ttno)
+        e_restored = restored_TTNS.expectation(restored_TTNO)
         np.testing.assert_allclose(e_restored, e_orig, rtol=1e-10)
 
     def test_missing_external_artifact_raises(self, aiida_profile, sho_basis, tmp_path):
@@ -113,13 +113,13 @@ class TestTTNSData:
         from aiida_renormalizer.data.ttns import TTNSData
 
         basis_tree = BasisTree.binary(sho_basis)
-        ttns = TTNS.random(basis_tree, qntot=0, m_max=10)
+        TTNS = TTNS.random(basis_tree, qntot=0, m_max=10)
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
 
         ttns_node = TTNSData.from_ttns(
-            ttns,
+            TTNS,
             basis_tree_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "missing"),
@@ -141,13 +141,13 @@ class TestTTNSData:
         from aiida_renormalizer.data.ttns import TTNSData
 
         basis_tree = BasisTree.binary(sho_basis)
-        ttns = TTNS.random(basis_tree, qntot=0, m_max=10)
+        TTNS = TTNS.random(basis_tree, qntot=0, m_max=10)
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
 
         ttns_node = TTNSData.from_ttns(
-            ttns,
+            TTNS,
             basis_tree_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "artifacts"),
@@ -159,8 +159,8 @@ class TestTTNSData:
         assert retrieved_basis_node.uuid == basis_tree_node.uuid
 
 
-class TestTtnoData:
-    """Tests for TtnoData serialization."""
+class TestTTNOData:
+    """Tests for TTNOData serialization."""
 
     def test_roundtrip(self, aiida_profile, sho_basis, tmp_path):
         from renormalizer import Op
@@ -169,17 +169,17 @@ class TestTtnoData:
         from renormalizer.tn.treebase import BasisTree
 
         from aiida_renormalizer.data.basis_tree import BasisTreeData
-        from aiida_renormalizer.data.ttno import TtnoData
+        from aiida_renormalizer.data.ttno import TTNOData
 
         basis_tree = BasisTree.binary(sho_basis)
         ham_terms = OpSum([Op("b^\\dagger b", "v0", 1.0), Op("b^\\dagger b", "v1", 1.5)])
-        ttno = TTNO(basis_tree, ham_terms)
+        TTNO = TTNO(basis_tree, ham_terms)
 
         basis_tree_node = BasisTreeData.from_basis_tree(basis_tree)
         basis_tree_node.store()
 
-        ttno_node = TtnoData.from_ttno(
-            ttno,
+        ttno_node = TTNOData.from_ttno(
+            TTNO,
             basis_tree_node,
             storage_backend="posix",
             storage_base=str(tmp_path / "ttno-artifacts"),
@@ -187,6 +187,6 @@ class TestTtnoData:
         )
         ttno_node.store()
 
-        restored = ttno_node.load_ttno()
-        assert len(restored) == len(ttno)
-        assert list(restored.bond_dims) == list(ttno.bond_dims)
+        restored_TTNO = ttno_node.load_ttno()
+        assert len(restored_TTNO) == len(TTNO)
+        assert list(restored_TTNO.bond_dims) == list(TTNO.bond_dims)

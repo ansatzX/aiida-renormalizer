@@ -5,7 +5,7 @@ import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.data import BasisTreeData, TTNSData, TtnoData, ConfigData
+from aiida_renormalizer.data import BasisTreeData, TTNSData, TTNOData, ConfigData
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -25,7 +25,7 @@ def sho_basis_tree(sho_basis):
 
 
 @pytest.fixture
-def sho_ttns(sho_basis_tree):
+def sho_TTNS(sho_basis_tree):
     """Create a random TTNS for testing."""
     from renormalizer.tn.tree import TTNS
 
@@ -33,7 +33,7 @@ def sho_ttns(sho_basis_tree):
 
 
 @pytest.fixture
-def sho_ttno(sho_basis_tree, sho_ham):
+def sho_TTNO(sho_basis_tree, sho_ham):
     """Create a TTNO from Hamiltonian for testing."""
     from renormalizer.tn.tree import TTNO
 
@@ -49,10 +49,10 @@ def basis_tree_data(sho_basis_tree):
 
 
 @pytest.fixture
-def ttns_data(sho_ttns, basis_tree_data, artifact_storage_base):
+def ttns_data(sho_TTNS, basis_tree_data, artifact_storage_base):
     """Create and store TTNSData node."""
     node = TTNSData.from_ttns(
-        sho_ttns,
+        sho_TTNS,
         basis_tree_data,
         storage_backend="posix",
         storage_base=str(artifact_storage_base),
@@ -63,26 +63,26 @@ def ttns_data(sho_ttns, basis_tree_data, artifact_storage_base):
 
 
 @pytest.fixture
-def ttno_data(sho_ttno, basis_tree_data):
-    """Create and store TtnoData node."""
-    node = TtnoData.from_ttno(sho_ttno, basis_tree_data)
+def ttno_data(sho_TTNO, basis_tree_data):
+    """Create and store TTNOData node."""
+    node = TTNOData.from_ttno(sho_TTNO, basis_tree_data)
     node.store()
     return node
 
 
-class TestOptimizeTtnsCalcJob:
-    """Tests for OptimizeTtnsCalcJob."""
+class TestOptimizeTTNSCalcJob:
+    """Tests for OptimizeTTNSCalcJob."""
 
     def test_calcjob_defined(self):
-        """OptimizeTtnsCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
+        """OptimizeTTNSCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
 
-        assert hasattr(OptimizeTtnsCalcJob, "_template_name")
-        assert OptimizeTtnsCalcJob._template_name == "ttn_optimize_driver.py.jinja"
+        assert hasattr(OptimizeTTNSCalcJob, "_template_name")
+        assert OptimizeTTNSCalcJob._template_name == "ttn_optimize_driver.py.jinja"
 
     def test_inputs_outputs(self):
-        """OptimizeTtnsCalcJob should define correct inputs/outputs."""
-        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
+        """OptimizeTTNSCalcJob should define correct inputs/outputs."""
+        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
         from unittest.mock import Mock
 
         spec = Mock()
@@ -91,7 +91,7 @@ class TestOptimizeTtnsCalcJob:
         spec.exit_code = Mock()
         spec.options = {}
 
-        OptimizeTtnsCalcJob.define(spec)
+        OptimizeTTNSCalcJob.define(spec)
 
         # Check inputs
         input_calls = [call for call in spec.input.call_args_list]
@@ -108,10 +108,10 @@ class TestOptimizeTtnsCalcJob:
         assert "output_ttns" in output_names
 
     def test_template_context(self, basis_tree_data, ttno_data):
-        """OptimizeTtnsCalcJob should provide correct template context."""
-        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
+        """OptimizeTTNSCalcJob should provide correct template context."""
+        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
 
-        calcjob = _make_calcjob(OptimizeTtnsCalcJob, {
+        calcjob = _make_calcjob(OptimizeTTNSCalcJob, {
             "basis_tree": basis_tree_data,
             "ttno": ttno_data,
         })
@@ -122,10 +122,10 @@ class TestOptimizeTtnsCalcJob:
         assert context["has_initial_ttns"] is False
 
     def test_template_context_with_initial_ttns(self, basis_tree_data, ttno_data, ttns_data):
-        """OptimizeTtnsCalcJob should handle initial TTNS input."""
-        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
+        """OptimizeTTNSCalcJob should handle initial TTNS input."""
+        from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
 
-        calcjob = _make_calcjob(OptimizeTtnsCalcJob, {
+        calcjob = _make_calcjob(OptimizeTTNSCalcJob, {
             "basis_tree": basis_tree_data,
             "ttno": ttno_data,
             "initial_ttns": ttns_data,
@@ -136,7 +136,7 @@ class TestOptimizeTtnsCalcJob:
         assert context["has_initial_ttns"] is True
 
     def test_template_exists(self):
-        """OptimizeTtnsCalcJob template file should exist."""
+        """OptimizeTTNSCalcJob template file should exist."""
         from pathlib import Path
 
         import aiida_renormalizer
@@ -147,19 +147,19 @@ class TestOptimizeTtnsCalcJob:
         assert template_path.exists(), f"Template not found: {template_path}"
 
 
-class TestTtnsEvolveCalcJob:
-    """Tests for TtnsEvolveCalcJob."""
+class TestTTNSEvolveCalcJob:
+    """Tests for TTNSEvolveCalcJob."""
 
     def test_calcjob_defined(self):
-        """TtnsEvolveCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.ttns_evolve import TtnsEvolveCalcJob
+        """TTNSEvolveCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.ttns_evolve import TTNSEvolveCalcJob
 
-        assert hasattr(TtnsEvolveCalcJob, "_template_name")
-        assert TtnsEvolveCalcJob._template_name == "ttns_evolve_driver.py.jinja"
+        assert hasattr(TTNSEvolveCalcJob, "_template_name")
+        assert TTNSEvolveCalcJob._template_name == "ttns_evolve_driver.py.jinja"
 
     def test_inputs_outputs(self):
-        """TtnsEvolveCalcJob should define correct inputs/outputs."""
-        from aiida_renormalizer.calculations.ttn.ttns_evolve import TtnsEvolveCalcJob
+        """TTNSEvolveCalcJob should define correct inputs/outputs."""
+        from aiida_renormalizer.calculations.ttn.ttns_evolve import TTNSEvolveCalcJob
         from unittest.mock import Mock
 
         spec = Mock()
@@ -168,7 +168,7 @@ class TestTtnsEvolveCalcJob:
         spec.exit_code = Mock()
         spec.options = {}
 
-        TtnsEvolveCalcJob.define(spec)
+        TTNSEvolveCalcJob.define(spec)
 
         # Check inputs
         input_calls = [call for call in spec.input.call_args_list]
@@ -188,7 +188,7 @@ class TestTtnsEvolveCalcJob:
         assert "output_ttns" in output_names
 
     def test_template_exists(self):
-        """TtnsEvolveCalcJob template file should exist."""
+        """TTNSEvolveCalcJob template file should exist."""
         from pathlib import Path
 
         import aiida_renormalizer
@@ -199,23 +199,23 @@ class TestTtnsEvolveCalcJob:
         assert template_path.exists(), f"Template not found: {template_path}"
 
 
-class TestTtnsSymbolicEvolveCalcJob:
-    """Tests for TtnsSymbolicEvolveCalcJob."""
+class TestTTNSSymbolicEvolveCalcJob:
+    """Tests for TTNSSymbolicEvolveCalcJob."""
 
     def test_calcjob_defined(self):
         from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
-            TtnsSymbolicEvolveCalcJob,
+            TTNSSymbolicEvolveCalcJob,
         )
 
-        assert hasattr(TtnsSymbolicEvolveCalcJob, "_template_name")
+        assert hasattr(TTNSSymbolicEvolveCalcJob, "_template_name")
         assert (
-            TtnsSymbolicEvolveCalcJob._template_name
+            TTNSSymbolicEvolveCalcJob._template_name
             == "ttns_symbolic_evolve_driver.py.jinja"
         )
 
     def test_inputs_outputs(self):
         from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
-            TtnsSymbolicEvolveCalcJob,
+            TTNSSymbolicEvolveCalcJob,
         )
         from unittest.mock import Mock
 
@@ -225,7 +225,7 @@ class TestTtnsSymbolicEvolveCalcJob:
         spec.exit_code = Mock()
         spec.options = {}
 
-        TtnsSymbolicEvolveCalcJob.define(spec)
+        TTNSSymbolicEvolveCalcJob.define(spec)
 
         input_names = [call[0][0] for call in spec.input.call_args_list]
         assert "symbolic_inputs" in input_names
@@ -239,7 +239,7 @@ class TestTtnsSymbolicEvolveCalcJob:
 
     def test_symbolic_validator(self):
         from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import (
-            TtnsSymbolicEvolveCalcJob,
+            TTNSSymbolicEvolveCalcJob,
         )
 
         good = {
@@ -256,8 +256,8 @@ class TestTtnsSymbolicEvolveCalcJob:
             "hamiltonian": [],
         }
 
-        assert TtnsSymbolicEvolveCalcJob._validate_symbolic_dict(good) is None
-        assert TtnsSymbolicEvolveCalcJob._validate_symbolic_dict(bad) is not None
+        assert TTNSSymbolicEvolveCalcJob._validate_symbolic_dict(good) is None
+        assert TTNSSymbolicEvolveCalcJob._validate_symbolic_dict(bad) is not None
 
     def test_template_exists(self):
         from pathlib import Path
@@ -269,40 +269,40 @@ class TestTtnsSymbolicEvolveCalcJob:
         assert template_path.exists(), f"Template not found: {template_path}"
 
 
-class TestTtnsObservableCalcJobs:
+class TestTTNSObservableCalcJobs:
     """Tests for TTN observable CalcJobs."""
 
     def test_expectation_calcjob_defined(self):
-        """TtnsExpectationCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsExpectationCalcJob
+        """TTNSExpectationCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSExpectationCalcJob
 
-        assert hasattr(TtnsExpectationCalcJob, "_template_name")
-        assert TtnsExpectationCalcJob._template_name == "ttns_expectation_driver.py.jinja"
+        assert hasattr(TTNSExpectationCalcJob, "_template_name")
+        assert TTNSExpectationCalcJob._template_name == "ttns_expectation_driver.py.jinja"
 
     def test_entropy_calcjob_defined(self):
-        """TtnsEntropyCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsEntropyCalcJob
+        """TTNSEntropyCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSEntropyCalcJob
 
-        assert hasattr(TtnsEntropyCalcJob, "_template_name")
-        assert TtnsEntropyCalcJob._template_name == "ttns_entropy_driver.py.jinja"
+        assert hasattr(TTNSEntropyCalcJob, "_template_name")
+        assert TTNSEntropyCalcJob._template_name == "ttns_entropy_driver.py.jinja"
 
     def test_mutual_info_calcjob_defined(self):
-        """TtnsMutualInfoCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsMutualInfoCalcJob
+        """TTNSMutualInfoCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSMutualInfoCalcJob
 
-        assert hasattr(TtnsMutualInfoCalcJob, "_template_name")
-        assert TtnsMutualInfoCalcJob._template_name == "ttns_mutual_info_driver.py.jinja"
+        assert hasattr(TTNSMutualInfoCalcJob, "_template_name")
+        assert TTNSMutualInfoCalcJob._template_name == "ttns_mutual_info_driver.py.jinja"
 
     def test_rdm_calcjob_defined(self):
-        """TtnsRdmCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsRdmCalcJob
+        """TTNSRdmCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSRdmCalcJob
 
-        assert hasattr(TtnsRdmCalcJob, "_template_name")
-        assert TtnsRdmCalcJob._template_name == "ttns_rdm_driver.py.jinja"
+        assert hasattr(TTNSRdmCalcJob, "_template_name")
+        assert TTNSRdmCalcJob._template_name == "ttns_rdm_driver.py.jinja"
 
     def test_expectation_inputs_outputs(self):
-        """TtnsExpectationCalcJob should define correct inputs/outputs."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsExpectationCalcJob
+        """TTNSExpectationCalcJob should define correct inputs/outputs."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSExpectationCalcJob
         from unittest.mock import Mock
 
         spec = Mock()
@@ -311,7 +311,7 @@ class TestTtnsObservableCalcJobs:
         spec.exit_code = Mock()
         spec.options = {}
 
-        TtnsExpectationCalcJob.define(spec)
+        TTNSExpectationCalcJob.define(spec)
 
         # Check inputs
         input_calls = [call for call in spec.input.call_args_list]
@@ -322,8 +322,8 @@ class TestTtnsObservableCalcJobs:
         assert "ttno" in input_names
 
     def test_rdm_inputs_outputs(self):
-        """TtnsRdmCalcJob should define correct inputs/outputs."""
-        from aiida_renormalizer.calculations.ttn.observables import TtnsRdmCalcJob
+        """TTNSRdmCalcJob should define correct inputs/outputs."""
+        from aiida_renormalizer.calculations.ttn.observables import TTNSRdmCalcJob
         from unittest.mock import Mock
 
         spec = Mock()
@@ -332,7 +332,7 @@ class TestTtnsObservableCalcJobs:
         spec.exit_code = Mock()
         spec.options = {}
 
-        TtnsRdmCalcJob.define(spec)
+        TTNSRdmCalcJob.define(spec)
 
         # Check inputs
         input_calls = [call for call in spec.input.call_args_list]

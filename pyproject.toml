@@ -15,7 +15,7 @@ dependencies = [
     "jinja2>=3",  # Required for CalcJob driver template rendering
     "click>=8",  # Required for CLI entry points
     "print-tree2",  # Required for TTN functionality
-    "tomli>=2; python_version<'3.11'",  # TOML parser for py<=3.11
+    "tomli>=2,<3",  # TOML parser (consistent dependency across Python versions)
 ]
 
 [project.optional-dependencies]
@@ -27,18 +27,18 @@ dev = [
 
 [project.entry-points."aiida.data"]
 "reno.model"  = "aiida_renormalizer.data.model:ModelData"
-"reno.mps"    = "aiida_renormalizer.data.mps:MpsData"
-"reno.mpo"    = "aiida_renormalizer.data.mpo:MpoData"
+"reno.mps"    = "aiida_renormalizer.data.mps:MPSData"
+"reno.mpo"    = "aiida_renormalizer.data.mpo:MPOData"
 "reno.op"     = "aiida_renormalizer.data.op:OpData"
 "reno.basis"  = "aiida_renormalizer.data.basis:BasisSetData"
 "reno.config" = "aiida_renormalizer.data.config:ConfigData"
 "reno.basis_tree" = "aiida_renormalizer.data.basis_tree:BasisTreeData"
 "reno.ttns"   = "aiida_renormalizer.data.ttns:TTNSData"
-"reno.ttno"   = "aiida_renormalizer.data.ttno:TtnoData"
+"reno.ttno"   = "aiida_renormalizer.data.ttno:TTNOData"
 
 [project.entry-points."aiida.calculations"]
 # L1 Atomic CalcJobs
-"reno.build_mpo" = "aiida_renormalizer.calculations.basic.build_mpo:BuildMpoCalcJob"
+"reno.build_mpo" = "aiida_renormalizer.calculations.basic.build_mpo:BuildMPOCalcJob"
 "reno.expectation" = "aiida_renormalizer.calculations.basic.expectation:ExpectationCalcJob"
 "reno.compress" = "aiida_renormalizer.calculations.basic.compress:CompressCalcJob"
 # L1.5 LEGO CalcJobs
@@ -60,24 +60,26 @@ dev = [
 # Bath pipeline CalcJobs
 "reno.bath_spectral_density" = "aiida_renormalizer.calculations.bath.bath_spectral_density:BathSpectralDensityCalcJob"
 "reno.bath_discretization" = "aiida_renormalizer.calculations.bath.bath_discretization:BathDiscretizationCalcJob"
-"reno.bath_to_mpo_coeff" = "aiida_renormalizer.calculations.bath.bath_to_mpo_coeff:BathToMpoCoeffCalcJob"
+"reno.bath_to_mpo_coeff" = "aiida_renormalizer.calculations.bath.bath_to_mpo_coeff:BathToMPOCoeffCalcJob"
 # L3 Scripted CalcJob
 "reno.script" = "aiida_renormalizer.calculations.scripted:RenoScriptCalcJob"
 # TTN CalcJobs
-"reno.ttn_optimize" = "aiida_renormalizer.calculations.ttn.optimize_ttns:OptimizeTtnsCalcJob"
-"reno.ttns_evolve" = "aiida_renormalizer.calculations.ttn.ttns_evolve:TtnsEvolveCalcJob"
-"reno.ttns_symbolic_evolve" = "aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve:TtnsSymbolicEvolveCalcJob"
-"reno.ttns_expectation" = "aiida_renormalizer.calculations.ttn.observables:TtnsExpectationCalcJob"
-"reno.ttns_entropy" = "aiida_renormalizer.calculations.ttn.observables:TtnsEntropyCalcJob"
-"reno.ttns_mutual_info" = "aiida_renormalizer.calculations.ttn.observables:TtnsMutualInfoCalcJob"
-"reno.ttns_rdm" = "aiida_renormalizer.calculations.ttn.observables:TtnsRdmCalcJob"
+"reno.ttn_optimize" = "aiida_renormalizer.calculations.ttn.optimize_ttns:OptimizeTTNSCalcJob"
+"reno.ttns_evolve" = "aiida_renormalizer.calculations.ttn.ttns_evolve:TTNSEvolveCalcJob"
+"reno.ttns_symbolic_evolve" = "aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve:TTNSSymbolicEvolveCalcJob"
+"reno.ttns_expectation" = "aiida_renormalizer.calculations.ttn.observables:TTNSExpectationCalcJob"
+"reno.ttns_entropy" = "aiida_renormalizer.calculations.ttn.observables:TTNSEntropyCalcJob"
+"reno.ttns_mutual_info" = "aiida_renormalizer.calculations.ttn.observables:TTNSMutualInfoCalcJob"
+"reno.ttns_rdm" = "aiida_renormalizer.calculations.ttn.observables:TTNSRdmCalcJob"
 
 [project.entry-points."aiida.parsers"]
 "reno.base" = "aiida_renormalizer.parsers.reno_base:RenoBaseParser"
 "reno.scripted" = "aiida_renormalizer.parsers.scripted:ScriptedParser"
 
-[project.entry-points."aiida.command"]
-"reno" = "aiida_renormalizer.cli.cmd_reno:reno"
+## Temporarily disable verdi CLI entrypoint during Python LEGO API refactor.
+## Re-enable after workflow/block interfaces are stabilized.
+#[project.entry-points."aiida.command"]
+#"reno" = "aiida_renormalizer.cli.cmd_reno:reno"
 
 [project.entry-points."aiida.workflows"]
 # L4 WorkChains - Core (M6)
@@ -97,14 +99,21 @@ dev = [
 # L4 WorkChains - CV + Advanced Dynamics (M8)
 "reno.correction_vector" = "aiida_renormalizer.workchains.correction_vector:CorrectionVectorWorkChain"
 "reno.charge_diffusion" = "aiida_renormalizer.workchains.charge_diffusion:ChargeDiffusionWorkChain"
-"reno.bath_mpo_pipeline" = "aiida_renormalizer.workchains.bath_mpo_pipeline:BathMpoPipelineWorkChain"
+"reno.bath_mpo_pipeline" = "aiida_renormalizer.workchains.bath_mpo_pipeline:BathMPOPipelineWorkChain"
 "reno.bath_spin_boson_model" = "aiida_renormalizer.workchains.bath_spin_boson_model:BathSpinBosonModelWorkChain"
+"reno.sbm_spectral_modes" = "aiida_renormalizer.workchains.sbm_spectral_modes:SbmSpectralModesWorkChain"
+"reno.sbm_model_from_modes" = "aiida_renormalizer.workchains.sbm_model_from_modes:SbmModelFromModesWorkChain"
+"reno.model_to_mpo" = "aiida_renormalizer.workchains.model_to_mpo:ModelToMPOWorkChain"
+"reno.mpo_to_initial_mps" = "aiida_renormalizer.workchains.mpo_to_initial_mps:MPOToInitialMPSWorkChain"
+"reno.mps_dynamics" = "aiida_renormalizer.workchains.mps_dynamics:MPSDynamicsWorkChain"
 "reno.spin_boson" = "aiida_renormalizer.workchains.spin_boson:SpinBosonWorkChain"
 "reno.vibronic" = "aiida_renormalizer.workchains.vibronic:VibronicWorkChain"
 # TTN WorkChains (M11)
-"reno.ttn_ground_state" = "aiida_renormalizer.workchains.ttn_ground_state:TtnGroundStateWorkChain"
-"reno.ttn_time_evolution" = "aiida_renormalizer.workchains.ttn_time_evolution:TtnTimeEvolutionWorkChain"
-"reno.ttn_mps_comparison" = "aiida_renormalizer.workchains.ttn_mps_comparison:TtnMpsComparisonWorkChain"
+"reno.ttn_ground_state" = "aiida_renormalizer.workchains.ttn_ground_state:TTNGroundStateWorkChain"
+"reno.ttn_time_evolution" = "aiida_renormalizer.workchains.ttn_time_evolution:TTNTimeEvolutionWorkChain"
+"reno.ttn_mps_comparison" = "aiida_renormalizer.workchains.ttn_mps_comparison:TTNMPSComparisonWorkChain"
+"reno.ttn_symbolic_model" = "aiida_renormalizer.workchains.ttn_symbolic_model:TTNSymbolicModelWorkChain"
+"reno.ttn_symbolic_dynamics" = "aiida_renormalizer.workchains.ttn_symbolic_dynamics:TTNSymbolicDynamicsWorkChain"
 
 [tool.setuptools.packages.find]
 where = ["src"]

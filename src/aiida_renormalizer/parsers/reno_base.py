@@ -11,7 +11,7 @@ from aiida import orm
 from aiida.engine import ExitCode
 from aiida.parsers import Parser
 
-from aiida_renormalizer.data import BasisTreeData, ModelData, MpoData, MpsData, TTNSData
+from aiida_renormalizer.data import BasisTreeData, ModelData, MPOData, MPSData, TTNSData
 
 
 class RenoBaseParser(Parser):
@@ -19,8 +19,8 @@ class RenoBaseParser(Parser):
 
     Responsibilities:
     1. Parse output_parameters.json → orm.Dict
-    2. Parse output_mps.npz → MpsData (if present)
-    3. Parse output_mpo.npz → MpoData (if present)
+    2. Parse output_mps.npz → MPSData (if present)
+    3. Parse output_mpo.npz → MPOData (if present)
     4. Physical validation (NaN, constraints, convergence)
     5. Map error conditions to exit codes
     """
@@ -113,8 +113,8 @@ class RenoBaseParser(Parser):
 
         return None
 
-    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MpsData:
-        """Parse an MPS .npz file into MpsData node."""
+    def _parse_mps_file(self, filename: str, model_data: ModelData) -> MPSData:
+        """Parse an MPS .npz file into MPSData node."""
         with self.retrieved.open(filename, 'rb') as f:
             with tempfile.NamedTemporaryFile(suffix='.npz', delete=False) as tmp:
                 tmp.write(f.read())
@@ -126,14 +126,14 @@ class RenoBaseParser(Parser):
             is_mpdm = getattr(self.node.inputs, 'is_mpdm', None)
             if is_mpdm is not None and is_mpdm.value:
                 from renormalizer.mps import MpDm
-                mps = MpDm.load(model, tmp_path)
+                MPS = MpDm.load(model, tmp_path)
             else:
                 from renormalizer.mps import Mps
-                mps = Mps.load(model, tmp_path)
+                MPS = Mps.load(model, tmp_path)
 
             storage_backend, storage_base, relative_path = self._get_artifact_location(filename)
-            mps_data = MpsData.from_mps(
-                mps,
+            mps_data = MPSData.from_mps(
+                MPS,
                 model_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,
@@ -144,8 +144,8 @@ class RenoBaseParser(Parser):
             import os
             os.unlink(tmp_path)
 
-    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MpoData:
-        """Parse an MPO .npz file into MpoData node."""
+    def _parse_mpo_file(self, filename: str, model_data: ModelData) -> MPOData:
+        """Parse an MPO .npz file into MPOData node."""
         import tempfile
 
         with self.retrieved.open(filename, 'rb') as f:
@@ -159,7 +159,7 @@ class RenoBaseParser(Parser):
             mpo = Mpo.load(model, tmp_path)
 
             storage_backend, storage_base, relative_path = self._get_artifact_location(filename)
-            mpo_data = MpoData.from_mpo(
+            mpo_data = MPOData.from_mpo(
                 mpo,
                 model_data,
                 storage_backend=storage_backend,
@@ -182,10 +182,10 @@ class RenoBaseParser(Parser):
             basis_tree = basis_tree_data.load_basis_tree()
             from renormalizer.tn.tree import TTNS
 
-            ttns = TTNS.load(basis_tree, tmp_path)
+            ttns_loaded = TTNS.load(basis_tree, tmp_path)
             storage_backend, storage_base, relative_path = self._get_artifact_location(filename)
             return TTNSData.from_ttns(
-                ttns,
+                ttns_loaded,
                 basis_tree_data,
                 storage_backend=storage_backend,
                 storage_base=storage_base,

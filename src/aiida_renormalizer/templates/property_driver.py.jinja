@@ -56,7 +56,7 @@ def save_output_parameters(params, output_file='output_parameters.json'):
 if __name__ == '__main__':
     # Load inputs
     model = load_model()
-    mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
 
     # Load observables manifest
     with open('observables_manifest.json', 'r') as f:
@@ -72,7 +72,7 @@ if __name__ == '__main__':
         if obs_type == 'mpo':
             # Load MPO and compute expectation
             mpo = load_mpo(obs_file, model)
-            value = mps.expectation(mpo)
+            value = MPS.expectation(mpo)
             observables[name] = float(value.real)
 
         elif obs_type == 'op':
@@ -87,7 +87,7 @@ if __name__ == '__main__':
             mpo = Mpo(model, opsum)
 
             # Compute expectation
-            value = mps.expectation(mpo)
+            value = MPS.expectation(mpo)
             observables[name] = float(value.real)
 
     # Output parameters
@@ -96,9 +96,9 @@ if __name__ == '__main__':
         'calc_type': 'property_scan',
         'observables': observables,
         'n_observables': len(observables),
-        'bond_dims': [int(d) for d in mps.bond_dims],
-        'bond_dims_mean': float(mps.bond_dims_mean),
-        'n_sites': len(mps),
+        'bond_dims': [int(d) for d in MPS.bond_dims],
+        'bond_dims_mean': float(MPS.bond_dims_mean),
+        'n_sites': len(MPS),
         'converged': True,
     }
     save_output_parameters(output_params)

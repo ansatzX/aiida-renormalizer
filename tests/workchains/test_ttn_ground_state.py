@@ -1,16 +1,16 @@
-"""Unit tests for TtnGroundStateWorkChain."""
+"""Unit tests for TTNGroundStateWorkChain."""
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
 from aiida import orm
 
-from aiida_renormalizer.workchains.ttn_ground_state import TtnGroundStateWorkChain
+from aiida_renormalizer.workchains.ttn_ground_state import TTNGroundStateWorkChain
 from tests.workchains.conftest import make_workchain, Namespace
 
 
 def test_ttn_ground_state_run_optimization():
     """Test TTN optimization execution."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     # Use Namespace so ``"key" in self.inputs`` works correctly
     wc.inputs = Namespace(
@@ -20,16 +20,16 @@ def test_ttn_ground_state_run_optimization():
     )
 
     # Run optimization -- self.submit is already mocked by make_workchain
-    result = TtnGroundStateWorkChain.run_optimization(wc)
+    result = TTNGroundStateWorkChain.run_optimization(wc)
 
-    # Check that submit was called with OptimizeTtnsCalcJob
+    # Check that submit was called with OptimizeTTNSCalcJob
     assert wc.submit.called
     assert result is not None
 
 
 def test_ttn_ground_state_inspect_success():
     """Test inspect_optimization with successful calculation."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     # Mock successful calculation
     calc = Mock()
@@ -47,7 +47,7 @@ def test_ttn_ground_state_inspect_success():
     wc.ctx.ground_state_calc = calc
 
     # Inspect
-    result = TtnGroundStateWorkChain.inspect_optimization(wc)
+    result = TTNGroundStateWorkChain.inspect_optimization(wc)
 
     # Check results
     assert result is None  # No error
@@ -57,7 +57,7 @@ def test_ttn_ground_state_inspect_success():
 
 def test_ttn_ground_state_inspect_not_converged():
     """Test inspect_optimization with non-converged calculation."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     # Mock non-converged calculation
     calc = Mock()
@@ -66,18 +66,18 @@ def test_ttn_ground_state_inspect_not_converged():
 
     wc.ctx = Namespace()
     wc.ctx.ground_state_calc = calc
-    wc.exit_codes = TtnGroundStateWorkChain.exit_codes
+    wc.exit_codes = TTNGroundStateWorkChain.exit_codes
 
     # Inspect
-    result = TtnGroundStateWorkChain.inspect_optimization(wc)
+    result = TTNGroundStateWorkChain.inspect_optimization(wc)
 
     # Should return error
-    assert result == TtnGroundStateWorkChain.exit_codes.ERROR_NOT_CONVERGED
+    assert result == TTNGroundStateWorkChain.exit_codes.ERROR_NOT_CONVERGED
 
 
 def test_ttn_ground_state_inspect_failure():
     """Test inspect_optimization with failed calculation."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     # Mock failed calculation
     calc = Mock()
@@ -86,18 +86,18 @@ def test_ttn_ground_state_inspect_failure():
 
     wc.ctx = Namespace()
     wc.ctx.ground_state_calc = calc
-    wc.exit_codes = TtnGroundStateWorkChain.exit_codes
+    wc.exit_codes = TTNGroundStateWorkChain.exit_codes
 
     # Inspect
-    result = TtnGroundStateWorkChain.inspect_optimization(wc)
+    result = TTNGroundStateWorkChain.inspect_optimization(wc)
 
     # Should return error
-    assert result == TtnGroundStateWorkChain.exit_codes.ERROR_CALCULATION_FAILED
+    assert result == TTNGroundStateWorkChain.exit_codes.ERROR_CALCULATION_FAILED
 
 
 def test_ttn_ground_state_inspect_energy_trajectory():
     """Test energy extraction from trajectory."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     # Mock successful calculation with energy trajectory
     calc = Mock()
@@ -113,7 +113,7 @@ def test_ttn_ground_state_inspect_energy_trajectory():
     wc.ctx.ground_state_calc = calc
 
     # Inspect
-    result = TtnGroundStateWorkChain.inspect_optimization(wc)
+    result = TTNGroundStateWorkChain.inspect_optimization(wc)
 
     # Check that last energy is used
     assert result is None
@@ -122,7 +122,7 @@ def test_ttn_ground_state_inspect_energy_trajectory():
 
 def test_ttn_ground_state_finalize():
     """Test finalize method."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     wc.ctx = Namespace()
     wc.ctx.ground_state = Mock()
@@ -130,7 +130,7 @@ def test_ttn_ground_state_finalize():
     wc.ctx.calc_params = {"iterations": 10}
 
     # Finalize
-    TtnGroundStateWorkChain.finalize(wc)
+    TTNGroundStateWorkChain.finalize(wc)
 
     # Check outputs
     assert wc.out.call_count >= 3  # ground_state, energy, output_parameters
@@ -138,7 +138,7 @@ def test_ttn_ground_state_finalize():
 
 def test_ttn_ground_state_with_initial_ttns():
     """Test that initial_ttns is passed when provided."""
-    wc = make_workchain(TtnGroundStateWorkChain)
+    wc = make_workchain(TTNGroundStateWorkChain)
 
     wc.inputs = Namespace(
         basis_tree=Mock(),
@@ -148,11 +148,11 @@ def test_ttn_ground_state_with_initial_ttns():
     )
 
     # Run optimization
-    TtnGroundStateWorkChain.run_optimization(wc)
+    TTNGroundStateWorkChain.run_optimization(wc)
 
     # Check that submit was called and initial_ttns was included
     assert wc.submit.called
     # The second positional arg is **inputs dict -- check the kwargs
     call_kwargs = wc.submit.call_args
-    # submit(OptimizeTtnsCalcJob, **inputs) -- kwargs should have initial_ttns
+    # submit(OptimizeTTNSCalcJob, **inputs) -- kwargs should have initial_ttns
     assert "initial_ttns" in call_kwargs.kwargs

@@ -1,4 +1,4 @@
-"""Driver script for TtnsEntropyCalcJob.
+"""Driver script for TTNSEntropyCalcJob.
 
 Compute von Neumann entropy at each node.
 """
@@ -37,13 +37,13 @@ def save_output_parameters(params, output_file='output_parameters.json'):
 if __name__ == '__main__':
     # Load inputs
     basis_tree = load_basis_tree()
-    ttns = load_ttns('initial_ttns.npz', basis_tree)
+    TTNS = load_ttns('initial_ttns.npz', basis_tree)
 
     # Compute entropy at each node
     # Note: This requires implementation in Renormalizer
     # For now, compute from bond dimensions as an approximation
     entropies = []
-    for inode, node in enumerate(ttns.node_list):
+    for inode, node in enumerate(TTNS.node_list):
         # Compute von Neumann entropy from Schmidt values
         # This is a placeholder - actual implementation would compute from RDM
         bond_dim = node.shape[-1] if node.parent is not None else 1
@@ -53,10 +53,10 @@ if __name__ == '__main__':
 
     # Prepare output parameters
     output_params = {
-        'calcjob_class': 'TtnsEntropyCalcJob',
+        'calcjob_class': 'TTNSEntropyCalcJob',
         'calc_type': 'entropy',
         'entropies': entropies,
         'total_entropy': float(sum(entropies)),
-        'n_nodes': len(ttns),
+        'n_nodes': len(TTNS),
     }
     save_output_parameters(output_params)

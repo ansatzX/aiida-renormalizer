@@ -5,7 +5,7 @@ import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData, ConfigData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, ConfigData
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -65,7 +65,7 @@ class TestDMRGCalcJob:
 
         # Create minimal inputs
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
 
         # Create CalcJob instance bypassing Process.__init__
         calcjob = _make_calcjob(DMRGCalcJob, {
@@ -85,8 +85,8 @@ class TestDMRGCalcJob:
         from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
-        mps_data = MpsData.from_mps(
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
+        mps_data = MPSData.from_mps(
             sho_mps,
             model_data,
             storage_backend="posix",
@@ -109,7 +109,7 @@ class TestDMRGCalcJob:
         from aiida_renormalizer.calculations.composite.dmrg import DMRGCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
 
         calcjob = _make_calcjob(DMRGCalcJob, {
             "model": model_data,

@@ -108,9 +108,9 @@ if __name__ == '__main__':
 
     # Load initial thermal state (if provided)
     {% if has_initial_mps %}
-    initial_thermal_state = load_mps('initial_thermal_state.npz', model)
+    MPS = load_mps('initial_thermal_state.npz', model)
     {% else %}
-    initial_thermal_state = None
+    MPS = None
     {% endif %}
 
     # Create charge diffusion calculator

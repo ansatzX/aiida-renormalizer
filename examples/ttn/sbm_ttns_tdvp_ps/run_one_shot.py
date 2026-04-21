@@ -1,99 +1,97 @@
 #!/usr/bin/env python
-"""Run symbolic TTNS TDVP-PS evolution in one official CalcJob."""
+"""SBM TTNS: system terms handwritten; env terms from spectral discretization."""
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+import numpy as np
+from aiida import load_profile, orm
+from aiida.engine import run_get_node
 
-from aiida import orm
-from aiida import load_profile
-from aiida.manage import get_manager
+from aiida_renormalizer.workchains.sbm_spectral_modes import SbmSpectralModesWorkChain
+from aiida_renormalizer.workchains.ttn_symbolic_dynamics import TTNSymbolicDynamicsWorkChain
 
-from aiida_renormalizer.calculations.ttn.ttns_symbolic_evolve import TtnsSymbolicEvolveCalcJob
+CODE = "@localhost"  # format: "code_label@computer_label"
+SPECTRAL = {
+    "alpha": 0.05,
+    "s_exponent": 0.7,
+    "omega_c": 5.0,
+    "raw_delta": 0.4,
+    "renormalization_p": 2.0,
+    "n_modes": 16,
+    "discretization": "trapz",
+}
+SYSTEM = {"epsilon": 0.0}
+TTN = {"tree_type": "binary", "m_max": 16}
+DYNAMICS = {"dt": 0.05, "nsteps": 40, "method": "tdvp_ps"}
 
+def _run(wc, **inputs):
+    outputs, node = run_get_node(wc, **inputs)
+    print(f"[{wc.__name__}] pk={node.pk}")
+    return outputs
 
-def _resolve_code() -> orm.AbstractCode:
-    candidate_codes = orm.QueryBuilder().append(orm.InstalledCode, project="*").all(flat=True)
-    for code in candidate_codes:
-        if code.default_calc_job_plugin != "reno.script":
-            continue
-        if code.computer.label != "localhost":
-            continue
-        if not Path(str(code.filepath_executable)).exists():
-            continue
-        return code
+def _build_symbolic_inputs(omega_k, c_j2, delta_eff, epsilon):
+    c_k = np.sqrt(c_j2)
+    nbas = np.maximum(16.0 * c_j2 / np.maximum(omega_k, 1e-12) ** 3, 4.0)
+    nbas = np.round(nbas).astype(int)
+    basis = [{"kind": "half_spin", "dof": "spin", "sigmaqn": [0, 0]}]
+    basis += [
+        {"kind": "sho", "dof": f"v_{i}", "omega": float(w), "nbas": int(n)}
+        for i, (w, n) in enumerate(zip(omega_k, nbas))
+    ]
 
-    computer = orm.load_computer("localhost")
-    executable = sys.executable
-    base_label = "reno-script-auto"
-    label = base_label
-    suffix = 1
-    while orm.QueryBuilder().append(orm.InstalledCode, filters={"label": label}).count() > 0:
-        label = f"{base_label}-{suffix}"
-        suffix += 1
-    return orm.InstalledCode(
-        label=label,
-        computer=computer,
-        filepath_executable=executable,
-        default_calc_job_plugin="reno.script",
-        description="Auto-created by examples/ttn/sbm_ttns_tdvp_ps/run_one_shot.py",
-    ).store()
-
+    terms = [
+        {"symbol": "sigma_z", "dofs": "spin", "factor": float(epsilon)},
+        {"symbol": "sigma_x", "dofs": "spin", "factor": float(delta_eff)},
+    ]
+    for i, w in enumerate(omega_k):
+        terms.extend(
+            [
+                {"symbol": "p^2", "dofs": f"v_{i}", "factor": 0.5},
+                {"symbol": "x^2", "dofs": f"v_{i}", "factor": 0.5 * float(w) ** 2},
+            ]
+        )
+        terms.append(
+            {
+                "symbol": "sigma_z x",
+                "dofs": ["spin", f"v_{i}"],
+                "factor": 0.5 * float(c_k[i]),
+            }
+        )
+    return {
+        "basis": basis,
+        "hamiltonian": terms,
+        "tree_type": TTN["tree_type"],
+        "m_max": TTN["m_max"],
+    }
 
 def main() -> None:
     load_profile()
-    code = _resolve_code()
-    repo_root = Path(__file__).resolve().parents[3]
-    artifact_base = repo_root / "tmp"
-    artifact_base.mkdir(parents=True, exist_ok=True)
+    if CODE.startswith("@"):
+        raise RuntimeError("Please set CODE = 'your_code_label@your_computer_label'")
 
-    symbolic_inputs = orm.Dict(
-        dict={
-            "basis": [
-                {"kind": "half_spin", "dof": "spin", "sigmaqn": [0, 0]},
-                {"kind": "sho", "dof": "v_0", "omega": 0.8, "nbas": 6},
-                {"kind": "sho", "dof": "v_1", "omega": 1.2, "nbas": 6},
-            ],
-            "hamiltonian": [
-                {"symbol": "sigma_x", "dofs": "spin", "factor": 0.4},
-                {"symbol": "sigma_z", "dofs": "spin", "factor": 0.05},
-                {"symbol": r"b^\dagger b", "dofs": "v_0", "factor": 0.8},
-                {"symbol": r"b^\dagger b", "dofs": "v_1", "factor": 1.2},
-                {"symbol": r"sigma_z x", "dofs": ["spin", "v_0"], "factor": 0.08},
-                {"symbol": r"sigma_z x", "dofs": ["spin", "v_1"], "factor": 0.06},
-            ],
-            "tree_type": "binary",
-            "m_max": 16,
-        }
+    spectral_outputs = _run(
+        SbmSpectralModesWorkChain,
+        alpha=orm.Float(SPECTRAL["alpha"]),
+        s_exponent=orm.Float(SPECTRAL["s_exponent"]),
+        omega_c=orm.Float(SPECTRAL["omega_c"]),
+        raw_delta=orm.Float(SPECTRAL["raw_delta"]),
+        renormalization_p=orm.Float(SPECTRAL["renormalization_p"]),
+        n_modes=orm.Int(SPECTRAL["n_modes"]),
+        discretization=orm.Str(SPECTRAL["discretization"]),
     )
+    omega_k = spectral_outputs["bath_modes"].get_array("omega_k")
+    c_j2 = spectral_outputs["bath_modes"].get_array("c_j2")
+    delta_eff = spectral_outputs["output_parameters"].get_dict()["delta_eff"]
 
-    builder = TtnsSymbolicEvolveCalcJob.get_builder()
-    builder.code = code
-    builder.symbolic_inputs = symbolic_inputs
-    builder.dt = orm.Float(0.05)
-    builder.nsteps = orm.Int(40)
-    builder.method = orm.Str("tdvp_ps")
-    builder.metadata.label = "example_sbm_ttns_tdvp_ps_one_shot"
-    builder.metadata.options.artifact_storage_backend = "posix"
-    builder.metadata.options.artifact_storage_base = str(artifact_base)
-    builder.metadata.options.resources = {"num_machines": 1, "num_mpiprocs_per_machine": 1}
-
-    runner = get_manager().create_runner(with_persistence=True, communicator=None, broker_submit=False)
-    result, node = runner.run_get_node(builder)
-    if "output_parameters" not in result:
-        raise RuntimeError(
-            f"output_parameters missing, exit_status={node.exit_status}, exit_message={node.exit_message}"
-        )
-    params = result["output_parameters"].get_dict()
-    time_points = params["time_points"]
-    if abs(time_points[0]) > 1e-14:
-        raise RuntimeError(f"Expected first trajectory point at t=0, got {time_points[0]}")
-
-    print(f"CalcJob PK: {node.pk}")
-    if "output_ttns" in result:
-        print(f"Output TTNS PK: {result['output_ttns'].pk}")
-    print(f"First 3 time points: {time_points[:3]}")
-    print(f"First 3 energies: {params['energy_trajectory'][:3]}")
+    symbolic_inputs = _build_symbolic_inputs(omega_k, c_j2, delta_eff, SYSTEM["epsilon"])
+    out = _run(
+        TTNSymbolicDynamicsWorkChain,
+        code=orm.load_code(CODE),
+        symbolic_inputs=orm.Dict(dict=symbolic_inputs),
+        dt=orm.Float(DYNAMICS["dt"]),
+        nsteps=orm.Int(DYNAMICS["nsteps"]),
+        method=orm.Str(DYNAMICS["method"]),
+    )
+    print(f"outputs: {sorted(out.keys())}")
 
 
 if __name__ == "__main__":

@@ -1,20 +1,20 @@
 """TTN (Tree Tensor Network) CalcJobs."""
-from .optimize_ttns import OptimizeTtnsCalcJob
-from .ttns_evolve import TtnsEvolveCalcJob
-from .ttns_symbolic_evolve import TtnsSymbolicEvolveCalcJob
+from .optimize_ttns import OptimizeTTNSCalcJob
+from .ttns_evolve import TTNSEvolveCalcJob
+from .ttns_symbolic_evolve import TTNSSymbolicEvolveCalcJob
 from .observables import (
-    TtnsExpectationCalcJob,
-    TtnsEntropyCalcJob,
-    TtnsMutualInfoCalcJob,
-    TtnsRdmCalcJob,
+    TTNSExpectationCalcJob,
+    TTNSEntropyCalcJob,
+    TTNSMutualInfoCalcJob,
+    TTNSRdmCalcJob,
 )
 
 __all__ = [
-    "OptimizeTtnsCalcJob",
-    "TtnsEvolveCalcJob",
-    "TtnsSymbolicEvolveCalcJob",
-    "TtnsExpectationCalcJob",
-    "TtnsEntropyCalcJob",
-    "TtnsMutualInfoCalcJob",
-    "TtnsRdmCalcJob",
+    "OptimizeTTNSCalcJob",
+    "TTNSEvolveCalcJob",
+    "TTNSSymbolicEvolveCalcJob",
+    "TTNSExpectationCalcJob",
+    "TTNSEntropyCalcJob",
+    "TTNSMutualInfoCalcJob",
+    "TTNSRdmCalcJob",
 ]

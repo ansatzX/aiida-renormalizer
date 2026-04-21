@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ImagTimeCalcJob(RenoBaseCalcJob):
@@ -18,13 +18,13 @@ class ImagTimeCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
-        initial_mps: MpsData (optional) - Initial state, random if not provided
+        mpo: MPOData - Hamiltonian operator
+        initial_mps: MPSData (optional) - Initial state, random if not provided
         config: ConfigData - EvolveConfig with imaginary time parameters
         beta: Float - Total imaginary time (inverse temperature)
 
     Outputs:
-        output_mps: MpsData - Ground state approximation
+        output_mps: MPSData - Ground state approximation
         output_parameters: Dict - Energy, convergence info
     """
 
@@ -37,12 +37,12 @@ class ImagTimeCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             help="Hamiltonian MPO",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS (random if not provided)",
         )
@@ -61,7 +61,7 @@ class ImagTimeCalcJob(RenoBaseCalcJob):
         # Outputs
         spec.output(
             "output_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="Ground state from imaginary time evolution",
         )
 
@@ -88,11 +88,11 @@ class ImagTimeCalcJob(RenoBaseCalcJob):
         # Write MPO
         mpo_data = self.inputs.mpo
         model_data = self.inputs.model
-        mpo = mpo_data.load_mpo(model_data)
+        MPO = mpo_data.load_mpo(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mpo_path = os.path.join(tmpdir, "mpo")
-            mpo.dump(mpo_path)
+            MPO.dump(mpo_path)
             actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mpo.npz", "wb") as dst:
@@ -101,11 +101,11 @@ class ImagTimeCalcJob(RenoBaseCalcJob):
         # Write initial MPS (if provided)
         if "initial_mps" in self.inputs:
             mps_data = self.inputs.initial_mps
-            mps = mps_data.load_mps(model_data)
+            MPS = mps_data.load_mps(model_data)
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 mps_path = os.path.join(tmpdir, "mps")
-                mps.dump(mps_path)
+                MPS.dump(mps_path)
                 actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
                 with open(actual, "rb") as src:
                     with folder.open("initial_mps.npz", "wb") as dst:

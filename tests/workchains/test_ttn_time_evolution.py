@@ -1,16 +1,16 @@
-"""Unit tests for TtnTimeEvolutionWorkChain."""
+"""Unit tests for TTNTimeEvolutionWorkChain."""
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
 from aiida import orm
 
-from aiida_renormalizer.workchains.ttn_time_evolution import TtnTimeEvolutionWorkChain
+from aiida_renormalizer.workchains.ttn_time_evolution import TTNTimeEvolutionWorkChain
 from tests.workchains.conftest import make_workchain, Namespace
 
 
 def test_ttn_time_evolution_setup():
     """Test setup method."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     wc.inputs = Namespace(
         total_time=orm.Float(20.0),
@@ -20,7 +20,7 @@ def test_ttn_time_evolution_setup():
     )
 
     # Setup
-    TtnTimeEvolutionWorkChain.setup(wc)
+    TTNTimeEvolutionWorkChain.setup(wc)
 
     # Check initialization
     assert wc.ctx.current_time == 0.0
@@ -34,7 +34,7 @@ def test_ttn_time_evolution_setup():
 
 def test_ttn_time_evolution_not_finished():
     """Test not_finished method."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     wc.inputs = Namespace(total_time=orm.Float(20.0), dt=orm.Float(0.5))
     wc.ctx = Namespace()
@@ -42,16 +42,16 @@ def test_ttn_time_evolution_not_finished():
     wc.ctx.total_steps = 20
 
     # Should continue
-    assert TtnTimeEvolutionWorkChain.not_finished(wc) is True
+    assert TTNTimeEvolutionWorkChain.not_finished(wc) is True
 
     wc.ctx.current_step = 20
     # Should stop
-    assert TtnTimeEvolutionWorkChain.not_finished(wc) is False
+    assert TTNTimeEvolutionWorkChain.not_finished(wc) is False
 
 
 def test_ttn_time_evolution_run_checkpoint():
     """Test run_checkpoint method."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     # Use Namespace so ``"key" in self.inputs`` works
     wc.inputs = Namespace(
@@ -74,7 +74,7 @@ def test_ttn_time_evolution_run_checkpoint():
     wc.ctx.n_checkpoints = 4
 
     # Run checkpoint -- self.submit is already mocked by make_workchain
-    result = TtnTimeEvolutionWorkChain.run_checkpoint(wc)
+    result = TTNTimeEvolutionWorkChain.run_checkpoint(wc)
 
     assert wc.submit.called
     assert result is not None
@@ -82,7 +82,7 @@ def test_ttn_time_evolution_run_checkpoint():
 
 def test_ttn_time_evolution_inspect_checkpoint_success():
     """Test inspect_checkpoint with successful calculation."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     # Mock successful calculation
     calc = Mock()
@@ -113,7 +113,7 @@ def test_ttn_time_evolution_inspect_checkpoint_success():
     wc.ctx.iteration = 0
 
     # Inspect
-    result = TtnTimeEvolutionWorkChain.inspect_checkpoint(wc)
+    result = TTNTimeEvolutionWorkChain.inspect_checkpoint(wc)
 
     # Check results
     assert result is None  # No error
@@ -124,7 +124,7 @@ def test_ttn_time_evolution_inspect_checkpoint_success():
 
 def test_ttn_time_evolution_inspect_checkpoint_failure():
     """Test inspect_checkpoint with failed calculation."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     calc = Mock()
     calc.is_finished_ok = False
@@ -132,16 +132,16 @@ def test_ttn_time_evolution_inspect_checkpoint_failure():
 
     wc.ctx = Namespace()
     wc.ctx.checkpoint_calc = calc
-    wc.exit_codes = TtnTimeEvolutionWorkChain.exit_codes
+    wc.exit_codes = TTNTimeEvolutionWorkChain.exit_codes
 
-    result = TtnTimeEvolutionWorkChain.inspect_checkpoint(wc)
+    result = TTNTimeEvolutionWorkChain.inspect_checkpoint(wc)
 
-    assert result == TtnTimeEvolutionWorkChain.exit_codes.ERROR_EVOLUTION_FAILED
+    assert result == TTNTimeEvolutionWorkChain.exit_codes.ERROR_EVOLUTION_FAILED
 
 
 def test_ttn_time_evolution_energy_drift_detection():
     """Test energy drift detection."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     # Mock calculation
     calc = Mock()
@@ -171,17 +171,17 @@ def test_ttn_time_evolution_energy_drift_detection():
     wc.ctx.trajectory_segments = []
     wc.ctx.iteration = 1
 
-    wc.exit_codes = TtnTimeEvolutionWorkChain.exit_codes
+    wc.exit_codes = TTNTimeEvolutionWorkChain.exit_codes
 
     # Large drift should trigger error
-    result = TtnTimeEvolutionWorkChain.inspect_checkpoint(wc)
+    result = TTNTimeEvolutionWorkChain.inspect_checkpoint(wc)
 
-    assert result == TtnTimeEvolutionWorkChain.exit_codes.ERROR_ENERGY_DRIFT
+    assert result == TTNTimeEvolutionWorkChain.exit_codes.ERROR_ENERGY_DRIFT
 
 
 def test_ttn_time_evolution_finalize():
     """Test finalize method."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     wc.inputs = Namespace(total_time=orm.Float(20.0), dt=orm.Float(0.5))
 
@@ -195,7 +195,7 @@ def test_ttn_time_evolution_finalize():
     wc.ctx.trajectory_segments = []  # No trajectory segments
 
     # Finalize
-    TtnTimeEvolutionWorkChain.finalize(wc)
+    TTNTimeEvolutionWorkChain.finalize(wc)
 
     # Check outputs
     assert wc.out.call_count >= 3  # final_ttns, checkpoints, output_parameters
@@ -205,7 +205,7 @@ def test_ttn_time_evolution_trajectory_concatenation():
     """Test trajectory concatenation."""
     import numpy as np
 
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     wc.inputs = Namespace(total_time=orm.Float(20.0), dt=orm.Float(0.5))
 
@@ -224,7 +224,7 @@ def test_ttn_time_evolution_trajectory_concatenation():
     wc.ctx.trajectory_segments = [mock_traj]
 
     # Finalize
-    TtnTimeEvolutionWorkChain.finalize(wc)
+    TTNTimeEvolutionWorkChain.finalize(wc)
 
     # Check that trajectory was output
     trajectory_calls = [call for call in wc.out.call_args_list if call[0][0] == "trajectory"]
@@ -235,7 +235,7 @@ def test_ttn_time_evolution_trajectory_concatenation_multi_segment():
     """Trajectory concatenation should offset times and drop duplicated boundaries."""
     import numpy as np
 
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
     wc.inputs = Namespace(total_time=orm.Float(20.0), dt=orm.Float(0.5))
 
     seg1 = Mock()
@@ -261,7 +261,7 @@ def test_ttn_time_evolution_trajectory_concatenation_multi_segment():
     wc.ctx.total_steps = 4
     wc.ctx.trajectory_segments = [(0.0, seg1), (1.0, seg2)]
 
-    TtnTimeEvolutionWorkChain.finalize(wc)
+    TTNTimeEvolutionWorkChain.finalize(wc)
 
     trajectory_calls = [call for call in wc.out.call_args_list if call[0][0] == "trajectory"]
     assert len(trajectory_calls) == 1
@@ -272,7 +272,7 @@ def test_ttn_time_evolution_trajectory_concatenation_multi_segment():
 
 def test_ttn_time_evolution_checkpoint_time_calculation():
     """Test checkpoint time calculation for non-integer divisions."""
-    wc = make_workchain(TtnTimeEvolutionWorkChain)
+    wc = make_workchain(TTNTimeEvolutionWorkChain)
 
     wc.inputs = Namespace(
         total_time=orm.Float(23.0),  # Non-integer multiple
@@ -282,7 +282,7 @@ def test_ttn_time_evolution_checkpoint_time_calculation():
     )
 
     # Setup
-    result = TtnTimeEvolutionWorkChain.setup(wc)
+    result = TTNTimeEvolutionWorkChain.setup(wc)
 
     # Should fail because total_time/checkpoint_time are not integer multiples of dt
-    assert result == TtnTimeEvolutionWorkChain.exit_codes.ERROR_TIME_GRID_MISMATCH
+    assert result == TTNTimeEvolutionWorkChain.exit_codes.ERROR_TIME_GRID_MISMATCH

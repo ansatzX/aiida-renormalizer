@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class TDVPCalcJob(RenoBaseCalcJob):
@@ -18,15 +18,15 @@ class TDVPCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
-        initial_mps: MpsData - Initial state
+        mpo: MPOData - Hamiltonian operator
+        initial_mps: MPSData - Initial state
         config: ConfigData - EvolveConfig with TDVP parameters
         total_time: Float - Total evolution time
         dt: Float - Time step
         trajectory_interval: Int (optional) - Save every N steps
 
     Outputs:
-        output_mps: MpsData - Final state
+        output_mps: MPSData - Final state
         trajectory: ArrayData - MPS snapshots at intervals
         output_parameters: Dict - Energy trajectory, observables
     """
@@ -40,12 +40,12 @@ class TDVPCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             help="Hamiltonian MPO",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="Initial MPS for time evolution",
         )
         spec.input(
@@ -75,7 +75,7 @@ class TDVPCalcJob(RenoBaseCalcJob):
         # Outputs
         spec.output(
             "output_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="Final MPS after evolution",
         )
         spec.output(
@@ -107,11 +107,11 @@ class TDVPCalcJob(RenoBaseCalcJob):
         # Write MPO
         mpo_data = self.inputs.mpo
         model_data = self.inputs.model
-        mpo = mpo_data.load_mpo(model_data)
+        MPO = mpo_data.load_mpo(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mpo_path = os.path.join(tmpdir, "mpo")
-            mpo.dump(mpo_path)
+            MPO.dump(mpo_path)
             actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mpo.npz", "wb") as dst:
@@ -119,11 +119,11 @@ class TDVPCalcJob(RenoBaseCalcJob):
 
         # Write initial MPS
         mps_data = self.inputs.initial_mps
-        mps = mps_data.load_mps(model_data)
+        MPS = mps_data.load_mps(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mps_path = os.path.join(tmpdir, "mps")
-            mps.dump(mps_path)
+            MPS.dump(mps_path)
             actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mps.npz", "wb") as dst:
@@ -147,6 +147,6 @@ class TDVPCalcJob(RenoBaseCalcJob):
 
             # Load and write each observable MPO
             for i, uuid in enumerate(observable_uuids):
-                # Note: This would need to load the MpoData node by UUID
+                # Note: This would need to load the MPOData node by UUID
                 # For now, this is a placeholder
                 pass

@@ -2,11 +2,11 @@
 
 from .bath_spectral_density import BathSpectralDensityCalcJob
 from .bath_discretization import BathDiscretizationCalcJob
-from .bath_to_mpo_coeff import BathToMpoCoeffCalcJob
+from .bath_to_mpo_coeff import BathToMPOCoeffCalcJob
 
 __all__ = [
     "BathSpectralDensityCalcJob",
     "BathDiscretizationCalcJob",
-    "BathToMpoCoeffCalcJob",
+    "BathToMPOCoeffCalcJob",
 ]
 

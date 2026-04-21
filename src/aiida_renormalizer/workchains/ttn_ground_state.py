@@ -4,11 +4,11 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
-from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTtnsCalcJob
-from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TtnoData
+from aiida_renormalizer.calculations.ttn.optimize_ttns import OptimizeTTNSCalcJob
+from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TTNOData
 
 
-class TtnGroundStateWorkChain(WorkChain):
+class TTNGroundStateWorkChain(WorkChain):
     """WorkChain for TTN ground state calculation with variational optimization.
 
     This WorkChain provides:
@@ -19,7 +19,7 @@ class TtnGroundStateWorkChain(WorkChain):
 
     Inputs:
         basis_tree: BasisTreeData - Tree topology and basis grouping
-        ttno: TtnoData - Hamiltonian TTNO operator
+        ttno: TTNOData - Hamiltonian TTNO operator
         initial_ttns: TTNSData (optional) - Initial guess, random if not provided
         config: ConfigData - Optimization configuration
         energy_convergence: Float - Energy convergence threshold
@@ -38,7 +38,7 @@ class TtnGroundStateWorkChain(WorkChain):
 
         # Inputs
         spec.input("basis_tree", valid_type=BasisTreeData, help="Tree topology and basis grouping")
-        spec.input("ttno", valid_type=TtnoData, help="Hamiltonian TTNO")
+        spec.input("ttno", valid_type=TTNOData, help="Hamiltonian TTNO")
         spec.input(
             "initial_ttns",
             valid_type=TTNSData,
@@ -103,7 +103,7 @@ class TtnGroundStateWorkChain(WorkChain):
             inputs["config"] = self.inputs.config
 
         # Submit optimization calculation
-        future = self.submit(OptimizeTtnsCalcJob, **inputs)
+        future = self.submit(OptimizeTTNSCalcJob, **inputs)
 
         return ToContext(ground_state_calc=future)
 
@@ -113,7 +113,7 @@ class TtnGroundStateWorkChain(WorkChain):
 
         if not calc.is_finished_ok:
             self.report(f"TTN optimization failed: exit_status={calc.exit_status}")
-            if calc.exit_status == OptimizeTtnsCalcJob.exit_codes.ERROR_NOT_CONVERGED.status:
+            if calc.exit_status == OptimizeTTNSCalcJob.exit_codes.ERROR_NOT_CONVERGED.status:
                 return self.exit_codes.ERROR_NOT_CONVERGED
             return self.exit_codes.ERROR_CALCULATION_FAILED
 

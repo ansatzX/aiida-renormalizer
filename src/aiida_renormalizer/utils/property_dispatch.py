@@ -5,12 +5,12 @@ import typing as t
 
 from aiida import orm
 
-from aiida_renormalizer.data import ModelData, MpsData
+from aiida_renormalizer.data import ModelData, MPSData
 
 
 def dispatch_observable(
     obs_spec: dict,
-    mps: MpsData,
+    mps: MPSData,
     model: ModelData,
 ) -> orm.Dict:
     """Dispatch an observable calculation to the appropriate L1 CalcJob.

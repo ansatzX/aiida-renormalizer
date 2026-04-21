@@ -1,4 +1,4 @@
-"""Driver script for BathToMpoCoeffCalcJob."""
+"""Driver script for BathToMPOCoeffCalcJob."""
 import json
 import numpy as np
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
             )
 
         output = {
-            "calcjob_class": "BathToMpoCoeffCalcJob",
+            "calcjob_class": "BathToMPOCoeffCalcJob",
             "calc_type": "bath_to_mpo_coeff",
             "omega_k": omega_scaled.tolist(),
             "c_j2": c_j2_scaled.tolist(),
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         import traceback
         save_output_parameters(
             {
-                "calcjob_class": "BathToMpoCoeffCalcJob",
+                "calcjob_class": "BathToMPOCoeffCalcJob",
                 "calc_type": "bath_to_mpo_coeff",
                 "converged": False,
                 "error": str(exc),

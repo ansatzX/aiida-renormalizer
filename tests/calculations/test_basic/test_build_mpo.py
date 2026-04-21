@@ -1,4 +1,4 @@
-"""Tests for BuildMpoCalcJob."""
+"""Tests for BuildMPOCalcJob."""
 from __future__ import annotations
 
 import pytest
@@ -7,17 +7,17 @@ from aiida import orm
 from aiida_renormalizer.data import ModelData, OpData
 
 
-class TestBuildMpoCalcJob:
+class TestBuildMPOCalcJob:
     def test_build_mpo_calcjob_defined(self):
-        """BuildMpoCalcJob should be properly defined."""
-        from aiida_renormalizer.calculations.basic.build_mpo import BuildMpoCalcJob
+        """BuildMPOCalcJob should be properly defined."""
+        from aiida_renormalizer.calculations.basic.build_mpo import BuildMPOCalcJob
 
-        assert hasattr(BuildMpoCalcJob, '_template_name')
-        assert BuildMpoCalcJob._template_name == 'build_mpo_driver.py.jinja'
+        assert hasattr(BuildMPOCalcJob, '_template_name')
+        assert BuildMPOCalcJob._template_name == 'build_mpo_driver.py.jinja'
 
     def test_build_mpo_inputs_outputs(self):
-        """BuildMpoCalcJob should define correct inputs/outputs."""
-        from aiida_renormalizer.calculations.basic.build_mpo import BuildMpoCalcJob
+        """BuildMPOCalcJob should define correct inputs/outputs."""
+        from aiida_renormalizer.calculations.basic.build_mpo import BuildMPOCalcJob
         from unittest.mock import Mock
 
         spec = Mock()
@@ -25,7 +25,7 @@ class TestBuildMpoCalcJob:
         spec.output = Mock()
         spec.options = {}
 
-        BuildMpoCalcJob.define(spec)
+        BuildMPOCalcJob.define(spec)
 
         # Check inputs
         input_calls = [call for call in spec.input.call_args_list]

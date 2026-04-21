@@ -5,7 +5,7 @@ import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -62,8 +62,8 @@ class TestTDVPCalcJob:
         from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
-        mps_data = MpsData.from_mps(
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
+        mps_data = MPSData.from_mps(
             sho_mps,
             model_data,
             storage_backend="posix",
@@ -90,8 +90,8 @@ class TestTDVPCalcJob:
         from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
-        mps_data = MpsData.from_mps(
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
+        mps_data = MPSData.from_mps(
             sho_mps,
             model_data,
             storage_backend="posix",

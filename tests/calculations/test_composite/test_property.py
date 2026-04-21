@@ -5,7 +5,7 @@ import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData, OpData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, OpData
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -66,14 +66,14 @@ class TestPropertyCalcJob:
         from aiida_renormalizer.calculations.composite.property import PropertyCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mps_data = MpsData.from_mps(
+        mps_data = MPSData.from_mps(
             sho_mps,
             model_data,
             storage_backend="posix",
             storage_base=str(artifact_storage_base),
             relative_path="composite/property_mps.npz",
         )
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
 
         # Create additional observable
         from renormalizer.model import Op

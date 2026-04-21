@@ -5,7 +5,7 @@ import pytest
 from aiida import orm
 from aiida.common import AttributeDict
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 def _make_calcjob(cls, inputs_dict):
@@ -59,7 +59,7 @@ class TestImagTimeCalcJob:
         from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
 
         calcjob = _make_calcjob(ImagTimeCalcJob, {
             "model": model_data,
@@ -79,7 +79,7 @@ class TestImagTimeCalcJob:
         from aiida_renormalizer.calculations.composite.imag_time import ImagTimeCalcJob
 
         model_data = ModelData.from_model(sho_model)
-        mpo_data = MpoData.from_mpo(sho_mpo, model_data)
+        mpo_data = MPOData.from_mpo(sho_mpo, model_data)
 
         calcjob = _make_calcjob(ImagTimeCalcJob, {
             "model": model_data,

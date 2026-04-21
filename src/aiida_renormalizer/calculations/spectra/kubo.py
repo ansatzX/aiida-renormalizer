@@ -10,7 +10,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class KuboCalcJob(RenoBaseCalcJob):
@@ -23,8 +23,8 @@ class KuboCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator (optional)
-        initial_mps: MpsData - Thermal density matrix if precomputed
+        mpo: MPOData - Hamiltonian operator (optional)
+        initial_mps: MPSData - Thermal density matrix if precomputed
         temperature: Float - Temperature in atomic units
         distance_matrix: ArrayData - Distance matrix D_ij = P_i - P_j
         insteps: Int - Steps for imaginary time propagation
@@ -45,13 +45,13 @@ class KuboCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (will be constructed if not provided)",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Pre-computed thermal density matrix (MpDm)",
         )
@@ -131,11 +131,11 @@ class KuboCalcJob(RenoBaseCalcJob):
         if "mpo" in self.inputs:
             mpo_data = self.inputs.mpo
             model_data = self.inputs.model
-            mpo = mpo_data.load_mpo(model_data)
+            MPO = mpo_data.load_mpo(model_data)
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 mpo_path = os.path.join(tmpdir, "mpo")
-                mpo.dump(mpo_path)
+                MPO.dump(mpo_path)
                 actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
                 with open(actual, "rb") as src:
                     with folder.open("initial_mpo.npz", "wb") as dst:
@@ -144,11 +144,11 @@ class KuboCalcJob(RenoBaseCalcJob):
         # Write initial thermal state (if provided)
         if "initial_mps" in self.inputs:
             mps_data = self.inputs.initial_mps
-            mps = mps_data.load_mps(self.inputs.model)
+            MPS = mps_data.load_mps(self.inputs.model)
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 mps_path = os.path.join(tmpdir, "mps")
-                mps.dump(mps_path)
+                MPS.dump(mps_path)
                 actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
                 with open(actual, "rb") as src:
                     with folder.open("initial_thermal_state.npz", "wb") as dst:

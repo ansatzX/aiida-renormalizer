@@ -9,7 +9,7 @@ from aiida.engine import CalcJobProcessSpec
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
 
 
-class BathToMpoCoeffCalcJob(RenoBaseCalcJob):
+class BathToMPOCoeffCalcJob(RenoBaseCalcJob):
     """Map bath mode parameters to MPO coefficient dictionaries.
 
     The mapping follows Renormalizer SBM conventions around:

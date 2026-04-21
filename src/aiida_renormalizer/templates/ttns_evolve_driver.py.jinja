@@ -1,4 +1,4 @@
-"""Driver script for TtnsEvolveCalcJob.
+"""Driver script for TTNSEvolveCalcJob.
 
 TTN time evolution using various methods (TDVP, etc.).
 """
@@ -74,13 +74,13 @@ def save_ttns(ttns, output_file='output_ttns.npz', description=''):
 if __name__ == '__main__':
     # Load inputs
     basis_tree = load_basis_tree()
-    ttns = load_ttns('initial_ttns.npz', basis_tree)
-    ttno = load_ttno('input_ttno.npz', basis_tree)
+    TTNS = load_ttns('initial_ttns.npz', basis_tree)
+    TTNO = load_ttno('input_ttno.npz', basis_tree)
     config = load_config()
     nsteps, dt = load_evolution_params()
 
     # Apply config to TTNS
-    ttns.evolve_config = config
+    TTNS.evolve_config = config
 
     # Get evolution parameters
     evolve_method = config.method
@@ -90,23 +90,23 @@ if __name__ == '__main__':
     times = []
 
     # Initial energy
-    E0 = ttns.expectation(ttno)
+    E0 = TTNS.expectation(TTNO)
     energies.append(float(E0))
     times.append(0.0)
 
     # Time evolution loop
     for istep in range(nsteps):
         # Evolve one step
-        ttns = ttns.evolve(ttno, dt, normalize=True)
+        TTNS = TTNS.evolve(TTNO, dt, normalize=True)
 
         # Compute energy
-        E = ttns.expectation(ttno)
+        E = TTNS.expectation(TTNO)
         energies.append(float(E))
         times.append((istep + 1) * dt)
 
     # Prepare output parameters
     output_params = {
-        'calcjob_class': 'TtnsEvolveCalcJob',
+        'calcjob_class': 'TTNSEvolveCalcJob',
         'calc_type': 'time_evolution',
         'nsteps': nsteps,
         'dt': dt,
@@ -115,14 +115,14 @@ if __name__ == '__main__':
         'time_points': times,
         'initial_energy': energies[0],
         'final_energy': energies[-1],
-        'bond_dims': [int(d) for d in ttns.bond_dims],
-        'n_nodes': len(ttns),
+        'bond_dims': [int(d) for d in TTNS.bond_dims],
+        'n_nodes': len(TTNS),
     }
     save_output_parameters(output_params)
 
     # Save evolved TTNS with description
     description = f'TTN evolved state, final E={energies[-1]:.10f}'
-    save_ttns(ttns, 'output_ttns.npz', description)
+    save_ttns(TTNS, 'output_ttns.npz', description)
 
     # Save trajectory arrays for downstream tooling
     np.savez(

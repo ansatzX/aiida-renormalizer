@@ -8,7 +8,7 @@ import pytest
 
 from aiida.orm import CalcJobNode
 
-from aiida_renormalizer.data import ModelData, MpsData
+from aiida_renormalizer.data import ModelData, MPSData
 from aiida_renormalizer.parsers.scripted import ScriptedParser
 
 
@@ -31,13 +31,13 @@ def simple_model():
 
 
 @pytest.fixture
-def simple_mps(simple_model, tmp_path):
+def simple_MPS(simple_model, tmp_path):
     from renormalizer.mps import Mps
 
     model = simple_model.load_model()
-    mps = Mps.random(model, qntot=0, m_max=8)
-    return MpsData.from_mps(
-        mps,
+    MPS = Mps.random(model, qntot=0, m_max=8)
+    return MPSData.from_mps(
+        MPS,
         simple_model,
         storage_backend="posix",
         storage_base=str(tmp_path / "fixture-artifacts"),
@@ -55,11 +55,11 @@ def test_validate_physical_constraints_passes_normal_values(scripted_parser):
     assert result["passed"] is True
 
 
-def test_parse_mps_file_returns_mpsdata(scripted_parser, simple_model, simple_mps, tmp_path):
+def test_parse_mps_file_returns_mpsdata(scripted_parser, simple_model, simple_MPS, tmp_path):
     model = simple_model.load_model()
-    mps = simple_mps.load_mps(simple_model)
+    MPS = simple_MPS.load_mps(simple_model)
     npz_path = Path(tmp_path) / "output_mps.npz"
-    mps.dump(str(npz_path.with_suffix("")))
+    MPS.dump(str(npz_path.with_suffix("")))
     assert npz_path.exists()
 
     mock_retrieved = MagicMock()
@@ -75,7 +75,7 @@ def test_parse_mps_file_returns_mpsdata(scripted_parser, simple_model, simple_mp
          patch.object(type(scripted_parser), "node", new_callable=lambda: property(lambda self: mock_node)):
         parsed = scripted_parser._parse_mps_file("output_mps.npz", simple_model)
 
-    assert isinstance(parsed, MpsData)
+    assert isinstance(parsed, MPSData)
     loaded = parsed.load_mps(simple_model)
     assert len(loaded) == model.nsite
 

@@ -8,30 +8,30 @@ from aiida.common.datastructures import CalcInfo, CodeInfo
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData, OpData, ConfigData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, OpData, ConfigData
 
 
 class RenoScriptCalcJob(RenoBaseCalcJob):
     """L3 ScriptedCalcJob for user-defined Python scripts.
 
     Allows users to write custom Python scripts that:
-    - Access AiiDA data nodes (ModelData, MpsData, MpoData, etc.) as Python objects
+    - Access AiiDA data nodes (ModelData, MPSData, MPOData, etc.) as Python objects
     - Use Renormalizer library directly
     - Return outputs that are automatically converted to AiiDA nodes
 
     Inputs:
         script: orm.Str - Python script content (or SinglefileData)
         model: ModelData (optional) - System definition
-        mps: MpsData (optional) - MPS state
-        mpo: MpoData (optional) - MPO operator
+        mps: MPSData (optional) - MPS state
+        mpo: MPOData (optional) - MPO operator
         op: OpData (optional) - Operator
         config: ConfigData (optional) - Configuration
         inputs: Dict (optional) - Additional scalar parameters
 
     Outputs:
         output_parameters: orm.Dict - Always present
-        output_mps: MpsData (optional) - If script creates MPS
-        output_mpo: MpoData (optional) - If script creates MPO
+        output_mps: MPSData (optional) - If script creates MPS
+        output_mpo: MPOData (optional) - If script creates MPO
         output_data: orm.Dict (optional) - Additional structured outputs
 
     Example script:
@@ -79,13 +79,13 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
         )
         spec.input(
             "mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="MPS state for script operations",
         )
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="MPO operator for script operations",
         )
@@ -120,13 +120,13 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
         )
         spec.output(
             "output_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Output MPS if created by script",
         )
         spec.output(
             "output_mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Output MPO if created by script",
         )
@@ -179,10 +179,10 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
             mps_data = self.inputs.mps
             model_data = self.inputs.model if "model" in self.inputs else None
             if model_data:
-                mps = mps_data.load_mps(model_data)
+                MPS = mps_data.load_mps(model_data)
                 with tempfile.TemporaryDirectory() as tmpdir:
                     mps_path = os.path.join(tmpdir, "mps")
-                    mps.dump(mps_path)
+                    MPS.dump(mps_path)
                     actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
                     with open(actual, "rb") as src:
                         with folder.open("input_mps.npz", "wb") as dst:
@@ -193,10 +193,10 @@ class RenoScriptCalcJob(RenoBaseCalcJob):
             mpo_data = self.inputs.mpo
             model_data = self.inputs.model if "model" in self.inputs else None
             if model_data:
-                mpo = mpo_data.load_mpo(model_data)
+                MPO = mpo_data.load_mpo(model_data)
                 with tempfile.TemporaryDirectory() as tmpdir:
                     mpo_path = os.path.join(tmpdir, "mpo")
-                    mpo.dump(mpo_path)
+                    MPO.dump(mpo_path)
                     actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
                     with open(actual, "rb") as src:
                         with folder.open("input_mpo.npz", "wb") as dst:

@@ -8,17 +8,17 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import BasisTreeData, TTNSData, TtnoData
+from aiida_renormalizer.data import BasisTreeData, TTNSData, TTNOData
 
 
-class OptimizeTtnsCalcJob(RenoBaseCalcJob):
+class OptimizeTTNSCalcJob(RenoBaseCalcJob):
     """TTN variational optimization for ground state.
 
     Corresponds to Reno API: optimize_ttns(ttns, ttno, procedure)
 
     Inputs:
         basis_tree: BasisTreeData - Tree topology and basis
-        ttno: TtnoData - Hamiltonian operator
+        ttno: TTNOData - Hamiltonian operator
         initial_ttns: TTNSData (optional) - Initial guess, random if not provided
         config: ConfigData - OptimizeConfig with convergence criteria
 
@@ -41,7 +41,7 @@ class OptimizeTtnsCalcJob(RenoBaseCalcJob):
         )
         spec.input(
             "ttno",
-            valid_type=TtnoData,
+            valid_type=TTNOData,
             help="Hamiltonian TTNO for optimization",
         )
         spec.input(
@@ -92,11 +92,11 @@ class OptimizeTtnsCalcJob(RenoBaseCalcJob):
 
         # Write TTNO
         ttno_data = self.inputs.ttno
-        ttno = ttno_data.load_ttno(basis_tree_data)
+        TTNO_obj = ttno_data.load_ttno(basis_tree_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ttno_path = os.path.join(tmpdir, "ttno")
-            ttno.dump(ttno_path)
+            TTNO_obj.dump(ttno_path)
             actual = ttno_path + ".npz" if os.path.exists(ttno_path + ".npz") else ttno_path
             with open(actual, "rb") as src:
                 with folder.open("input_ttno.npz", "wb") as dst:
@@ -105,11 +105,11 @@ class OptimizeTtnsCalcJob(RenoBaseCalcJob):
         # Write initial TTNS (if provided)
         if "initial_ttns" in self.inputs:
             ttns_data = self.inputs.initial_ttns
-            ttns = ttns_data.load_ttns(basis_tree_data)
+            TTNS_obj = ttns_data.load_ttns(basis_tree_data)
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 ttns_path = os.path.join(tmpdir, "ttns")
-                ttns.dump(ttns_path)
+                TTNS_obj.dump(ttns_path)
                 actual = ttns_path + ".npz" if os.path.exists(ttns_path + ".npz") else ttns_path
                 with open(actual, "rb") as src:
                     with folder.open("initial_ttns.npz", "wb") as dst:

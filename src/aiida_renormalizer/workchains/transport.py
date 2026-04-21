@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
 from aiida_renormalizer.calculations.spectra.kubo import KuboCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class KuboTransportWorkChain(WorkChain):
@@ -23,8 +23,8 @@ class KuboTransportWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator (optional)
-        initial_mps: MpsData - Pre-computed thermal state (optional)
+        mpo: MPOData - Hamiltonian operator (optional)
+        initial_mps: MPSData - Pre-computed thermal state (optional)
         temperature: Float - Temperature (alternative to beta)
         beta: Float - Inverse temperature (alternative to temperature)
         current_op: OpData - Current operator (will be constructed if not provided)
@@ -57,13 +57,13 @@ class KuboTransportWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="System definition")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (will be built if not provided)",
         )
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Pre-computed thermal density matrix (MpDm)",
         )

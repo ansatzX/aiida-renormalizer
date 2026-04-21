@@ -4,22 +4,22 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain, ToContext, while_
 
-from aiida_renormalizer.calculations.ttn.ttns_evolve import TtnsEvolveCalcJob
-from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TtnoData
+from aiida_renormalizer.calculations.ttn.ttns_evolve import TTNSEvolveCalcJob
+from aiida_renormalizer.data import BasisTreeData, ConfigData, TTNSData, TTNOData
 
 
-class TtnTimeEvolutionWorkChain(WorkChain):
+class TTNTimeEvolutionWorkChain(WorkChain):
     """WorkChain for TTN time evolution with checkpointing and validation.
 
     This WorkChain implements:
-    1. Long-time evolution by splitting into multiple TtnsEvolveCalcJob runs
+    1. Long-time evolution by splitting into multiple TTNSEvolveCalcJob runs
     2. Automatic checkpointing (saves intermediate states)
     3. Energy drift detection and handling
     4. Trajectory concatenation
 
     Inputs:
         basis_tree: BasisTreeData - Tree topology and basis grouping
-        ttno: TtnoData - Hamiltonian operator
+        ttno: TTNOData - Hamiltonian operator
         initial_ttns: TTNSData - Initial state
         total_time: Float - Total evolution time
         checkpoint_time: Float - Time per checkpoint segment
@@ -41,7 +41,7 @@ class TtnTimeEvolutionWorkChain(WorkChain):
 
         # Inputs
         spec.input("basis_tree", valid_type=BasisTreeData, help="Tree topology and basis grouping")
-        spec.input("ttno", valid_type=TtnoData, help="Hamiltonian TTNO")
+        spec.input("ttno", valid_type=TTNOData, help="Hamiltonian TTNO")
         spec.input("initial_ttns", valid_type=TTNSData, help="Initial TTNS")
         spec.input("total_time", valid_type=orm.Float, help="Total evolution time")
         spec.input(
@@ -166,7 +166,7 @@ class TtnTimeEvolutionWorkChain(WorkChain):
             f"current_time={self.ctx.current_time})"
         )
 
-        # Build inputs for TtnsEvolveCalcJob
+        # Build inputs for TTNSEvolveCalcJob
         inputs = {
             "basis_tree": self.inputs.basis_tree,
             "ttno": self.inputs.ttno,
@@ -181,8 +181,8 @@ class TtnTimeEvolutionWorkChain(WorkChain):
 
         self.ctx.current_segment_start_time = self.ctx.current_time
 
-        # Submit TtnsEvolveCalcJob
-        future = self.submit(TtnsEvolveCalcJob, **inputs)
+        # Submit TTNSEvolveCalcJob
+        future = self.submit(TTNSEvolveCalcJob, **inputs)
 
         return ToContext(checkpoint_calc=future)
 

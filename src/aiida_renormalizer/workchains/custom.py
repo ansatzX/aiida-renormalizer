@@ -4,7 +4,7 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain, ToContext, while_
 
-from aiida_renormalizer.data import ModelData, MpsData
+from aiida_renormalizer.data import ModelData, MPSData
 
 
 class CustomPipelineWorkChain(WorkChain):
@@ -33,11 +33,11 @@ class CustomPipelineWorkChain(WorkChain):
     Inputs:
         pipeline: List - List of step specifications
         model: ModelData - System definition (optional, can be per-step)
-        initial_state: MpsData - Initial MPS state
+        initial_state: MPSData - Initial MPS state
         code: AbstractCode - Code to use (optional, can be per-step)
 
     Outputs:
-        final_state: MpsData - Final MPS after pipeline execution
+        final_state: MPSData - Final MPS after pipeline execution
         output_parameters: Dict - Pipeline execution statistics
 
     Exit Codes:
@@ -50,7 +50,7 @@ class CustomPipelineWorkChain(WorkChain):
     STEP_DISPATCH_TABLE = {
         'compress': ('aiida_renormalizer.calculations.basic', 'CompressCalcJob'),
         'expectation': ('aiida_renormalizer.calculations.basic', 'ExpectationCalcJob'),
-        'build_mpo': ('aiida_renormalizer.calculations.basic', 'BuildMpoCalcJob'),
+        'build_mpo': ('aiida_renormalizer.calculations.basic', 'BuildMPOCalcJob'),
         'tdvp': ('aiida_renormalizer.calculations.composite', 'TDVPCalcJob'),
         'dmrg': ('aiida_renormalizer.calculations.composite', 'DMRGCalcJob'),
         'imag_time': ('aiida_renormalizer.calculations.composite', 'ImagTimeCalcJob'),
@@ -82,7 +82,7 @@ class CustomPipelineWorkChain(WorkChain):
         )
         spec.input(
             "initial_state",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS state",
         )
@@ -94,7 +94,7 @@ class CustomPipelineWorkChain(WorkChain):
         )
 
         # Outputs
-        spec.output("final_state", valid_type=MpsData, required=False, help="Final MPS state")
+        spec.output("final_state", valid_type=MPSData, required=False, help="Final MPS state")
         spec.output("output_parameters", valid_type=orm.Dict, help="Pipeline execution statistics")
 
         # Exit codes

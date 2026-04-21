@@ -1,4 +1,4 @@
-"""MpoData node for Renormalizer MPO persistence."""
+"""MPOData node for Renormalizer MPO persistence."""
 from __future__ import annotations
 
 import tempfile
@@ -19,7 +19,7 @@ from aiida_renormalizer.data.artifacts import (
 from aiida_renormalizer.data.utils import get_linked_node, write_json_to_repository
 
 
-class MpoData(Data):
+class MPOData(Data):
     """AiiDA Data node storing a Renormalizer Mpo."""
 
     @classmethod
@@ -31,8 +31,8 @@ class MpoData(Data):
         storage_backend: str = "posix",
         storage_base: str | None = None,
         relative_path: str | None = None,
-    ) -> MpoData:
-        """Create an MpoData node from a Reno Mpo."""
+    ) -> MPOData:
+        """Create an MPOData node from a Reno Mpo."""
         node = cls()
         if storage_base is None:
             storage_base = str(tempfile.gettempdir())

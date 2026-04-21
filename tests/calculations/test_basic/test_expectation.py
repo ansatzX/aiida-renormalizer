@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from aiida import orm
 
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class TestExpectationCalcJob:

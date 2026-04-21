@@ -9,12 +9,12 @@ from aiida.engine import WorkChain, ToContext, if_
 from aiida_renormalizer.calculations.bath import (
     BathSpectralDensityCalcJob,
     BathDiscretizationCalcJob,
-    BathToMpoCoeffCalcJob,
+    BathToMPOCoeffCalcJob,
 )
 from aiida_renormalizer.data import ModelData
 
 
-class BathMpoPipelineWorkChain(WorkChain):
+class BathMPOPipelineWorkChain(WorkChain):
     """Construct bath MPO coefficients from continuous or discrete spectrum data.
 
     Branching behavior:
@@ -197,7 +197,7 @@ class BathMpoPipelineWorkChain(WorkChain):
             "frequency_scale": self.inputs.frequency_scale,
             "coupling_scale": self.inputs.coupling_scale,
         }
-        return ToContext(mapping_calc=self.submit(BathToMpoCoeffCalcJob, **inputs))
+        return ToContext(mapping_calc=self.submit(BathToMPOCoeffCalcJob, **inputs))
 
     def inspect_mapping(self):
         calc = self.ctx.mapping_calc

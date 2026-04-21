@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpoData, MpsData
+from aiida_renormalizer.data import ModelData, MPOData, MPSData
 
 
 class ExpectationCalcJob(RenoBaseCalcJob):
@@ -24,8 +24,8 @@ class ExpectationCalcJob(RenoBaseCalcJob):
         super().define(spec)
 
         # Additional inputs
-        spec.input('mps', valid_type=MpsData, help='MPS state')
-        spec.input('mpo', valid_type=MpoData, help='MPO operator')
+        spec.input('mps', valid_type=MPSData, help='MPS state')
+        spec.input('mpo', valid_type=MPOData, help='MPO operator')
 
         # Outputs (output_parameters already defined in base)
         # expectation value will be in output_parameters
@@ -37,11 +37,11 @@ class ExpectationCalcJob(RenoBaseCalcJob):
         # Write MPS
         mps_data = self.inputs.mps
         model_data = self.inputs.model
-        mps = mps_data.load_mps(model_data)
+        MPS = mps_data.load_mps(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mps_path = os.path.join(tmpdir, 'mps')
-            mps.dump(mps_path)
+            MPS.dump(mps_path)
             actual = mps_path + '.npz' if os.path.exists(mps_path + '.npz') else mps_path
             with open(actual, 'rb') as src:
                 with folder.open('initial_mps.npz', 'wb') as dst:
@@ -49,11 +49,11 @@ class ExpectationCalcJob(RenoBaseCalcJob):
 
         # Write MPO
         mpo_data = self.inputs.mpo
-        mpo = mpo_data.load_mpo(model_data)
+        MPO = mpo_data.load_mpo(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mpo_path = os.path.join(tmpdir, 'mpo')
-            mpo.dump(mpo_path)
+            MPO.dump(mpo_path)
             actual = mpo_path + '.npz' if os.path.exists(mpo_path + '.npz') else mpo_path
             with open(actual, 'rb') as src:
                 with folder.open('initial_mpo.npz', 'wb') as dst:

@@ -1,4 +1,4 @@
-"""Driver script for OptimizeTtnsCalcJob.
+"""Driver script for OptimizeTTNSCalcJob.
 
 TTN variational optimization for ground state.
 """
@@ -69,41 +69,41 @@ def save_ttns(ttns, output_file='output_ttns.npz', description=''):
 if __name__ == '__main__':
     # Load inputs
     basis_tree = load_basis_tree()
-    ttno = load_ttno('input_ttno.npz', basis_tree)
+    TTNO = load_ttno('input_ttno.npz', basis_tree)
     config = load_config()
 
     # Load or create initial TTNS
     {% if has_initial_ttns %}
-    ttns = load_ttns('initial_ttns.npz', basis_tree)
+    TTNS = load_ttns('initial_ttns.npz', basis_tree)
     {% else %}
     # Create random TTNS as initial guess
     # Use bond dimension from config or default
     m_max = config.procedure[-1][0] if config.procedure else 50
-    ttns = TTNS.random(basis_tree, qntot=0, m_max=m_max)
+    TTNS = TTNS.random(basis_tree, qntot=0, m_max=m_max)
     {% endif %}
 
     # Apply config to TTNS
-    ttns.optimize_config = config
+    TTNS.optimize_config = config
 
     # Run TTN optimization
-    energy_list = optimize_ttns(ttns, ttno)
+    energy_list = optimize_ttns(TTNS, TTNO)
 
     # Prepare output parameters
     final_energy = energy_list[-1] if energy_list else None
 
     output_params = {
-        'calcjob_class': 'OptimizeTtnsCalcJob',
+        'calcjob_class': 'OptimizeTTNSCalcJob',
         'calc_type': 'optimization',
         'energy_trajectory': energy_list,
         'final_energy': final_energy,
         'ground_state_energy': final_energy,
         'n_iterations': len(energy_list),
-        'bond_dims': [int(d) for d in ttns.bond_dims],
-        'n_nodes': len(ttns),
+        'bond_dims': [int(d) for d in TTNS.bond_dims],
+        'n_nodes': len(TTNS),
         'converged': True,  # Would need to check actual convergence
     }
     save_output_parameters(output_params)
 
     # Save optimized TTNS with description
     description = f'TTN optimized state, E0={final_energy:.10f}'
-    save_ttns(ttns, 'output_ttns.npz', description)
+    save_ttns(TTNS, 'output_ttns.npz', description)

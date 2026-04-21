@@ -75,25 +75,25 @@ def save_mps(mps, output_file='output_mps.npz', description=''):
 if __name__ == '__main__':
     # Load inputs
     model = load_model()
-    mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
     config = load_config()
 
     # Store initial bond dimensions
-    initial_bond_dims = [int(d) for d in mps.bond_dims]
+    initial_bond_dims = [int(d) for d in MPS.bond_dims]
 
     # Compress MPS
-    mps.compress(config)
+    MPS.compress(config)
 
     # Save outputs
     output_params = {
         'calcjob_class': 'CompressCalcJob',
         'initial_bond_dims': initial_bond_dims,
-        'final_bond_dims': [int(d) for d in mps.bond_dims],
-        'n_sites': len(mps),
+        'final_bond_dims': [int(d) for d in MPS.bond_dims],
+        'n_sites': len(MPS),
         'converged': True,
     }
     save_output_parameters(output_params)
 
     # Save compressed MPS with description
     description = 'Compressed MPS from CompressCalcJob'
-    save_mps(mps, 'output_mps.npz', description)
+    save_mps(MPS, 'output_mps.npz', description)

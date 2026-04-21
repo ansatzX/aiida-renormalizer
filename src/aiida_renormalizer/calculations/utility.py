@@ -5,13 +5,13 @@ import numpy as np
 from aiida import orm
 from aiida.engine import calcfunction
 
-from aiida_renormalizer.data import MpoData, MpsData
+from aiida_renormalizer.data import MPOData, MPSData
 
 
 @calcfunction
 def validate_result(
-    mps: MpsData,
-    mpo: MpoData,
+    mps: MPSData,
+    mpo: MPOData,
     checks: orm.List,
 ) -> orm.Dict:
     """Physical validation (from llm_reno Validator agent experience).

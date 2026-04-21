@@ -1,4 +1,4 @@
-"""Driver script for BuildMpoCalcJob.
+"""Driver script for BuildMPOCalcJob.
 
 Constructs an MPO from a symbolic operator (Op or OpSum).
 """
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # Save outputs
     output_params = {
-        'calcjob_class': 'BuildMpoCalcJob',
+        'calcjob_class': 'BuildMPOCalcJob',
         'n_sites': len(mpo),
         'bond_dims': [int(d) for d in mpo.bond_dims],
         'converged': True,
@@ -77,5 +77,5 @@ if __name__ == '__main__':
     save_output_parameters(output_params)
 
     # Save MPO with description
-    description = 'MPO from BuildMpoCalcJob'
+    description = 'MPO from BuildMPOCalcJob'
     save_mpo(mpo, 'output_mpo.npz', description)

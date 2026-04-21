@@ -5,7 +5,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext, if_, while_
 
 from aiida_renormalizer.calculations.composite.tdvp import TDVPCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class TimeEvolutionWorkChain(WorkChain):
@@ -19,8 +19,8 @@ class TimeEvolutionWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator
-        initial_mps: MpsData - Initial state
+        mpo: MPOData - Hamiltonian operator
+        initial_mps: MPSData - Initial state
         total_time: Float - Total evolution time
         checkpoint_time: Float - Time per checkpoint segment
         dt: Float - Time step
@@ -28,7 +28,7 @@ class TimeEvolutionWorkChain(WorkChain):
         config: ConfigData - Evolution configuration
 
     Outputs:
-        final_mps: MpsData - Final evolved state
+        final_mps: MPSData - Final evolved state
         trajectory: ArrayData - Concatenated trajectory
         checkpoints: List - List of checkpoint MPS nodes
         output_parameters: Dict - Evolution statistics
@@ -41,8 +41,8 @@ class TimeEvolutionWorkChain(WorkChain):
 
         # Inputs
         spec.input("model", valid_type=ModelData, help="System definition")
-        spec.input("mpo", valid_type=MpoData, help="Hamiltonian MPO")
-        spec.input("initial_mps", valid_type=MpsData, help="Initial MPS")
+        spec.input("mpo", valid_type=MPOData, help="Hamiltonian MPO")
+        spec.input("initial_mps", valid_type=MPSData, help="Initial MPS")
         spec.input("total_time", valid_type=orm.Float, help="Total evolution time")
         spec.input(
             "checkpoint_time",
@@ -67,7 +67,7 @@ class TimeEvolutionWorkChain(WorkChain):
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
 
         # Outputs
-        spec.output("final_mps", valid_type=MpsData, help="Final evolved state")
+        spec.output("final_mps", valid_type=MPSData, help="Final evolved state")
         spec.output(
             "trajectory",
             valid_type=orm.ArrayData,

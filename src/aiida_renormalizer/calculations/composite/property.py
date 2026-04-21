@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData, OpData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, OpData
 
 
 class PropertyCalcJob(RenoBaseCalcJob):
@@ -18,8 +18,8 @@ class PropertyCalcJob(RenoBaseCalcJob):
 
     Inputs:
         model: ModelData - System definition
-        mps: MpsData - Quantum state
-        observables: Dict[str, Union[MpoData, OpData]] - Named observables
+        mps: MPSData - Quantum state
+        observables: Dict[str, Union[MPOData, OpData]] - Named observables
 
     Outputs:
         output_parameters: Dict - All observable values
@@ -34,7 +34,7 @@ class PropertyCalcJob(RenoBaseCalcJob):
         # Additional inputs
         spec.input(
             "mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             help="MPS state to measure",
         )
         spec.input_namespace(
@@ -55,11 +55,11 @@ class PropertyCalcJob(RenoBaseCalcJob):
         # Write MPS
         mps_data = self.inputs.mps
         model_data = self.inputs.model
-        mps = mps_data.load_mps(model_data)
+        MPS = mps_data.load_mps(model_data)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mps_path = os.path.join(tmpdir, "mps")
-            mps.dump(mps_path)
+            MPS.dump(mps_path)
             actual = mps_path + ".npz" if os.path.exists(mps_path + ".npz") else mps_path
             with open(actual, "rb") as src:
                 with folder.open("initial_mps.npz", "wb") as dst:
@@ -68,12 +68,12 @@ class PropertyCalcJob(RenoBaseCalcJob):
         # Write observables manifest
         observables_manifest = {}
         for name, obs_data in self.inputs.observables.items():
-            if isinstance(obs_data, MpoData):
+            if isinstance(obs_data, MPOData):
                 # Write MPO file
-                mpo = obs_data.load_mpo(model_data)
+                MPO = obs_data.load_mpo(model_data)
                 with tempfile.TemporaryDirectory() as tmpdir:
                     mpo_path = os.path.join(tmpdir, f"obs_{name}")
-                    mpo.dump(mpo_path)
+                    MPO.dump(mpo_path)
                     actual = mpo_path + ".npz" if os.path.exists(mpo_path + ".npz") else mpo_path
                     with open(actual, "rb") as src:
                         with folder.open(f"observable_{name}.npz", "wb") as dst:

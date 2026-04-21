@@ -126,9 +126,9 @@ if __name__ == '__main__':
     {% endif %}
 
     {% if has_mps %}
-    mps = load_mps('input_mps.npz', model)
+    MPS = load_mps('input_mps.npz', model)
     {% else %}
-    mps = None
+    MPS = None
     {% endif %}
 
     {% if has_mpo %}

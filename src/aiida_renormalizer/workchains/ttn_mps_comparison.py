@@ -5,11 +5,11 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
 from aiida_renormalizer.workchains.ground_state import GroundStateWorkChain
-from aiida_renormalizer.workchains.ttn_ground_state import TtnGroundStateWorkChain
-from aiida_renormalizer.data import ModelData, MpsData, MpoData, BasisTreeData, TtnoData, TTNSData
+from aiida_renormalizer.workchains.ttn_ground_state import TTNGroundStateWorkChain
+from aiida_renormalizer.data import ModelData, MPSData, MPOData, BasisTreeData, TTNOData, TTNSData
 
 
-class TtnMpsComparisonWorkChain(WorkChain):
+class TTNMPSComparisonWorkChain(WorkChain):
     """WorkChain for benchmarking TTN vs MPS on the same problem.
 
     This WorkChain performs comparative analysis by:
@@ -25,10 +25,10 @@ class TtnMpsComparisonWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian MPO (for MPS)
+        mpo: MPOData - Hamiltonian MPO (for MPS)
         basis_tree: BasisTreeData - Tree topology (for TTN)
-        ttno: TtnoData - Hamiltonian TTNO (for TTN)
-        initial_mps: MpsData (optional) - Initial MPS guess
+        ttno: TTNOData - Hamiltonian TTNO (for TTN)
+        initial_mps: MPSData (optional) - Initial MPS guess
         initial_ttns: TTNSData (optional) - Initial TTNS guess
         calculation_type: Str - "ground_state" or "time_evolution"
         config_mps: Dict - MPS calculation configuration
@@ -36,7 +36,7 @@ class TtnMpsComparisonWorkChain(WorkChain):
         code: AbstractCode - Code to use
 
     Outputs:
-        mps_result: MpsData - MPS result
+        mps_result: MPSData - MPS result
         ttn_result: TTNSData - TTN result
         comparison_data: Dict - Comparative analysis
         output_parameters: Dict - Comparison statistics
@@ -49,12 +49,12 @@ class TtnMpsComparisonWorkChain(WorkChain):
 
         # Inputs
         spec.input("model", valid_type=ModelData, help="System definition")
-        spec.input("mpo", valid_type=MpoData, help="Hamiltonian MPO (for MPS)")
+        spec.input("mpo", valid_type=MPOData, help="Hamiltonian MPO (for MPS)")
         spec.input("basis_tree", valid_type=BasisTreeData, help="Tree topology (for TTN)")
-        spec.input("ttno", valid_type=TtnoData, help="Hamiltonian TTNO (for TTN)")
+        spec.input("ttno", valid_type=TTNOData, help="Hamiltonian TTNO (for TTN)")
         spec.input(
             "initial_mps",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Initial MPS guess",
         )
@@ -79,7 +79,7 @@ class TtnMpsComparisonWorkChain(WorkChain):
         spec.input("dt", valid_type=orm.Float, required=False, help="Time step")
 
         # Outputs
-        spec.output("mps_result", valid_type=MpsData, help="MPS result")
+        spec.output("mps_result", valid_type=MPSData, help="MPS result")
         spec.output("ttn_result", valid_type=TTNSData, help="TTN result")
         spec.output("comparison_data", valid_type=orm.Dict, help="Comparative analysis")
         spec.output("output_parameters", valid_type=orm.Dict, help="Comparison statistics")
@@ -179,7 +179,7 @@ class TtnMpsComparisonWorkChain(WorkChain):
         self.report(f"Running TTN {calc_type}")
 
         if calc_type == "ground_state":
-            # Build inputs for TtnGroundStateWorkChain
+            # Build inputs for TTNGroundStateWorkChain
             inputs = {
                 "basis_tree": self.inputs.basis_tree,
                 "ttno": self.inputs.ttno,
@@ -193,11 +193,11 @@ class TtnMpsComparisonWorkChain(WorkChain):
                 inputs["config"] = self.inputs.config_ttn
 
             # Submit TTN ground state calculation
-            future = self.submit(TtnGroundStateWorkChain, **inputs)
+            future = self.submit(TTNGroundStateWorkChain, **inputs)
             return ToContext(ttn_calc=future)
 
         else:
-            # Time evolution - would use TtnTimeEvolutionWorkChain
+            # Time evolution - would use TTNTimeEvolutionWorkChain
             self.report("TTN time evolution not yet implemented in comparison")
             return self.exit_codes.ERROR_UNSUPPORTED_CALCULATION
 

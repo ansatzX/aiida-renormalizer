@@ -8,7 +8,7 @@ from aiida.engine import WorkChain, ToContext, if_
 
 from aiida_renormalizer.calculations.spectra.charge_diffusion import ChargeDiffusionCalcJob
 from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ChargeDiffusionWorkChain(WorkChain):
@@ -29,8 +29,8 @@ class ChargeDiffusionWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition (must be HolsteinModel)
-        mpo: MpoData (optional) - Hamiltonian operator
-        thermal_state: MpsData (optional) - Pre-computed thermal state
+        mpo: MPOData (optional) - Hamiltonian operator
+        thermal_state: MPSData (optional) - Pre-computed thermal state
         temperature: Float - Temperature in atomic units
         init_electron: Str - "fc" (Franck-Condon) or "relaxed"
         stop_at_edge: Bool - Stop when charge reaches boundary
@@ -43,7 +43,7 @@ class ChargeDiffusionWorkChain(WorkChain):
 
     Outputs:
         trajectory: ArrayData - MSD trajectory and time series
-        thermal_state: MpsData - Thermal state used
+        thermal_state: MPSData - Thermal state used
         output_parameters: Dict - Diffusion statistics
     """
 
@@ -56,13 +56,13 @@ class ChargeDiffusionWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="System definition (must be HolsteinModel)")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (built if not provided)",
         )
         spec.input(
             "thermal_state",
-            valid_type=MpsData,
+            valid_type=MPSData,
             required=False,
             help="Pre-computed thermal state (will be computed if not provided)",
         )

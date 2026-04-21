@@ -7,7 +7,7 @@ from aiida import orm
 from aiida.engine import WorkChain, ToContext
 
 from aiida_renormalizer.calculations.composite.thermal_prop import ThermalPropCalcJob
-from aiida_renormalizer.data import ModelData, MpsData, MpoData
+from aiida_renormalizer.data import ModelData, MPSData, MPOData
 
 
 class ThermalStateWorkChain(WorkChain):
@@ -20,7 +20,7 @@ class ThermalStateWorkChain(WorkChain):
 
     Inputs:
         model: ModelData - System definition
-        mpo: MpoData - Hamiltonian operator (optional, will be built if not provided)
+        mpo: MPOData - Hamiltonian operator (optional, will be built if not provided)
         temperature: Float - Target temperature (alternative to beta)
         beta: Float - Inverse temperature (alternative to temperature)
         config: Dict - Thermal propagation configuration
@@ -29,7 +29,7 @@ class ThermalStateWorkChain(WorkChain):
         code: AbstractCode - Code to use
 
     Outputs:
-        thermal_mpdm: MpsData - Thermal density matrix (MpDm)
+        thermal_mpdm: MPSData - Thermal density matrix (MpDm)
         partition_function: Float - Partition function Z
         free_energy: Float - Free energy F = -kT ln Z
         output_parameters: Dict - Thermal state statistics
@@ -49,7 +49,7 @@ class ThermalStateWorkChain(WorkChain):
         spec.input("model", valid_type=ModelData, help="System definition")
         spec.input(
             "mpo",
-            valid_type=MpoData,
+            valid_type=MPOData,
             required=False,
             help="Hamiltonian MPO (will be built if not provided)",
         )
@@ -81,7 +81,7 @@ class ThermalStateWorkChain(WorkChain):
         spec.input("code", valid_type=orm.AbstractCode, help="Code to use")
 
         # Outputs
-        spec.output("thermal_mpdm", valid_type=MpsData, help="Thermal density matrix (MpDm)")
+        spec.output("thermal_mpdm", valid_type=MPSData, help="Thermal density matrix (MpDm)")
         spec.output("partition_function", valid_type=orm.Float, help="Partition function Z")
         spec.output("free_energy", valid_type=orm.Float, help="Free energy F = -kT ln Z")
         spec.output("output_parameters", valid_type=orm.Dict, help="Thermal state statistics")
@@ -170,12 +170,12 @@ class ThermalStateWorkChain(WorkChain):
             self.report(f"WARNING: Unknown space '{space}', using GS")
             init_mpdm = MpDm.max_entangled_gs(model)
 
-        # Store as MpsData
+        # Store as MPSData
         artifact_base = self.inputs.metadata.options.get(
             "artifact_storage_base",
             str(tempfile.gettempdir()),
         )
-        init_mpdm_node = MpsData.from_mps(
+        init_mpdm_node = MPSData.from_mps(
             init_mpdm,
             self.inputs.model,
             storage_backend=self.inputs.metadata.options.get("artifact_storage_backend", "posix"),

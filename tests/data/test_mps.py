@@ -1,4 +1,4 @@
-"""Tests for MpsData."""
+"""Tests for MPSData."""
 from __future__ import annotations
 
 import hashlib
@@ -8,16 +8,16 @@ import numpy as np
 import pytest
 
 
-class TestMpsData:
+class TestMPSData:
     def test_roundtrip_external_artifact(self, aiida_profile, sho_model, sho_mps, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mps import MpsData
+        from aiida_renormalizer.data.mps import MPSData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
         artifact_base = tmp_path / "artifacts"
-        mps_node = MpsData.from_mps(
+        mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
             storage_backend="posix",
@@ -36,22 +36,22 @@ class TestMpsData:
             artifact_path.read_bytes()
         ).hexdigest()
 
-        restored = mps_node.load_mps()
-        assert len(restored) == len(sho_mps)
-        assert list(restored.bond_dims) == list(sho_mps.bond_dims)
+        restored_MPS = mps_node.load_mps()
+        assert len(restored_MPS) == len(sho_mps)
+        assert list(restored_MPS.bond_dims) == list(sho_mps.bond_dims)
 
     def test_roundtrip_preserves_expectation(
         self, aiida_profile, sho_model, sho_mps, sho_mpo, tmp_path
     ):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mps import MpsData
+        from aiida_renormalizer.data.mps import MPSData
 
         e_orig = sho_mps.expectation(sho_mpo)
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
-        mps_node = MpsData.from_mps(
+        mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
             storage_backend="posix",
@@ -61,12 +61,12 @@ class TestMpsData:
         mps_node.store()
 
         restored_model = model_node.load_model()
-        restored_mps = mps_node.load_mps()
+        restored_MPS = mps_node.load_mps()
 
         from renormalizer.mps import Mpo
 
         mpo_restored = Mpo(restored_model)
-        e_restored = restored_mps.expectation(mpo_restored)
+        e_restored = restored_MPS.expectation(mpo_restored)
 
         np.testing.assert_allclose(e_restored, e_orig, rtol=1e-10)
 
@@ -74,14 +74,14 @@ class TestMpsData:
         self, aiida_profile, sho_model, sho_mps, tmp_path
     ):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mps import MpsData
+        from aiida_renormalizer.data.mps import MPSData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
         first_base = tmp_path / "first"
         second_base = tmp_path / "second"
-        mps_node = MpsData.from_mps(
+        mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
             storage_backend="posix",
@@ -99,17 +99,17 @@ class TestMpsData:
 
         assert mps_node.artifact_metadata["storage_base"] == str(second_base)
         assert mps_node.artifact_metadata["relative_path"] == "published/mps.npz"
-        restored = mps_node.load_mps()
-        assert list(restored.bond_dims) == list(sho_mps.bond_dims)
+        restored_MPS = mps_node.load_mps()
+        assert list(restored_MPS.bond_dims) == list(sho_mps.bond_dims)
 
     def test_missing_external_artifact_raises(self, aiida_profile, sho_model, sho_mps, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mps import MpsData
+        from aiida_renormalizer.data.mps import MPSData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
-        mps_node = MpsData.from_mps(
+        mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
             storage_backend="posix",
@@ -126,12 +126,12 @@ class TestMpsData:
 
     def test_model_data_link(self, aiida_profile, sho_model, sho_mps, tmp_path):
         from aiida_renormalizer.data.model import ModelData
-        from aiida_renormalizer.data.mps import MpsData
+        from aiida_renormalizer.data.mps import MPSData
 
         model_node = ModelData.from_model(sho_model)
         model_node.store()
 
-        mps_node = MpsData.from_mps(
+        mps_node = MPSData.from_mps(
             sho_mps,
             model_node,
             storage_backend="posix",

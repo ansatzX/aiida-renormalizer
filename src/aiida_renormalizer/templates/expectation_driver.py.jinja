@@ -56,18 +56,18 @@ def save_output_parameters(params, output_file='output_parameters.json'):
 if __name__ == '__main__':
     # Load inputs
     model = load_model()
-    mps = load_mps('initial_mps.npz', model)
+    MPS = load_mps('initial_mps.npz', model)
     mpo = load_mpo('initial_mpo.npz', model)
 
     # Calculate expectation value
-    expectation = mps.expectation(mpo)
+    expectation = MPS.expectation(mpo)
 
     # Save outputs
     output_params = {
         'calcjob_class': 'ExpectationCalcJob',
         'expectation': float(expectation.real) if np.isreal(expectation) else complex(expectation),
-        'n_sites': len(mps),
-        'bond_dims': [int(d) for d in mps.bond_dims],
+        'n_sites': len(MPS),
+        'bond_dims': [int(d) for d in MPS.bond_dims],
         'converged': True,
     }
     save_output_parameters(output_params)

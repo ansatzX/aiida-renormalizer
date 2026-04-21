@@ -1,4 +1,4 @@
-"""MpsData node for Renormalizer MPS/MpDm persistence."""
+"""MPSData node for Renormalizer MPS/MpDm persistence."""
 from __future__ import annotations
 
 import typing as t
@@ -19,40 +19,40 @@ from aiida_renormalizer.data.artifacts import (
 from aiida_renormalizer.data.utils import get_linked_node, write_json_to_repository
 
 
-class MpsData(Data):
+class MPSData(Data):
     """AiiDA Data node storing a Renormalizer Mps or MpDm."""
 
     @classmethod
     def from_mps(
         cls,
-        mps: Mps,
+        mps_obj: Mps,
         model_data: ModelData,
         *,
         storage_backend: str,
         storage_base: str,
         relative_path: str,
-    ) -> MpsData:
-        """Create an MpsData node from a Reno Mps/MpDm."""
+    ) -> MPSData:
+        """Create an MPSData node from a Reno Mps/MpDm."""
         from renormalizer.mps import MpDm
 
         node = cls()
 
         # Attributes
-        node.base.attributes.set("n_sites", len(mps))
-        node.base.attributes.set("bond_dims", [int(d) for d in mps.bond_dims])
+        node.base.attributes.set("n_sites", len(mps_obj))
+        node.base.attributes.set("bond_dims", [int(d) for d in mps_obj.bond_dims])
         node.base.attributes.set(
             "qntot",
-            mps.qntot.tolist() if isinstance(mps.qntot, np.ndarray) else mps.qntot,
+            mps_obj.qntot.tolist() if isinstance(mps_obj.qntot, np.ndarray) else mps_obj.qntot,
         )
         node.base.attributes.set(
-            "qnidx", int(mps.qnidx) if mps.qnidx is not None else None
+            "qnidx", int(mps_obj.qnidx) if mps_obj.qnidx is not None else None
         )
-        node.base.attributes.set("dtype", str(mps.dtype))
-        node.base.attributes.set("is_mpdm", isinstance(mps, MpDm))
+        node.base.attributes.set("dtype", str(mps_obj.dtype))
+        node.base.attributes.set("is_mpdm", isinstance(mps_obj, MpDm))
         node.base.attributes.set("model_data_uuid", str(model_data.uuid))
 
         artifact = write_external_artifact(
-            mps,
+            mps_obj,
             storage_backend=storage_backend,
             storage_base=storage_base,
             relative_path=relative_path,
@@ -137,7 +137,8 @@ class MpsData(Data):
         if not artifact_path.exists():
             raise FileNotFoundError(f"MPS artifact not found: {artifact_path}")
 
-        return loader_class.load(model, str(artifact_path))
+        mps_loaded = loader_class.load(model, str(artifact_path))
+        return mps_loaded
 
     def relink_artifact(self, storage_base: str, relative_path: str) -> None:
         """Update the logical artifact location."""
