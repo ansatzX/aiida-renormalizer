@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+"""Single-file H2O QC script (translated from ori_examples/h2o_qc.py)."""
+
+from __future__ import annotations
+
+import logging
+
+from renormalizer import Model, Mpo, Mps, optimize_mps
+from renormalizer.model import h_qc
+from renormalizer.utils import log
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    log.set_stream_level(logging.INFO)
+    h1e, h2e, nuc = h_qc.read_fcidump(INPUT["fcidump_file"], int(MODEL["spatial_norbs"]))
+    basis, ham_terms = h_qc.qc_model(h1e, h2e)
+
+    model = Model(basis, ham_terms)
+    mpo = Mpo(model)
+    mps = Mps.random(model, MODEL["nelec"], int(MODEL["m_max"]), percent=1.0)
+
+    mps.optimize_config.procedure = [[MODEL["m_max"], 0.4], [MODEL["m_max"], 0.2], [MODEL["m_max"], 0.1], [MODEL["m_max"], 0]]
+    mps.optimize_config.method = CALC["method"]
+    energies, _ = optimize_mps(mps.copy(), mpo)
+    gs_e = min(energies) + nuc
+    print("ground_state_energy=", gs_e)
+
+
+if __name__ == "__main__":
+    main()

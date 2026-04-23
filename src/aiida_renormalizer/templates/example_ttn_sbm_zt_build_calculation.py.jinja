@@ -1,0 +1,16 @@
+DT = {{ dt_literal }}
+NSTEPS = {{ nsteps_literal }}
+METHOD = {{ method_literal }}
+
+
+def run_core_solver_loop():
+    ttns, ttno, exp_z, exp_x = build_network_operators_and_state()
+    ttns.evolve_config = EvolveConfig(EvolveMethod(METHOD))
+
+    expectations = []
+    for _ in range(NSTEPS):
+        ttns = ttns.evolve(ttno, DT)
+        z = ttns.expectation(exp_z)
+        x = ttns.expectation(exp_x)
+        expectations.append((float(z), float(x)))
+    return expectations

@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+"""Single-file optical SSH script rendered from OpData and BasisSpecData."""
+
+from __future__ import annotations
+
+from renormalizer.model import basis as ba
+from renormalizer.model.model import Model
+from renormalizer.model.op import Op
+from renormalizer.mps import Mpo, Mps
+from renormalizer.mps.gs import optimize_mps
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def build_model():
+    ham_terms = []
+{{ hamiltonian_terms_block | indent(4, true) }}
+{{ basis_spec_block | indent(4, true) }}
+    return Model(basis, ham_terms)
+
+
+def main() -> None:
+    model = build_model()
+    mpo = Mpo(model)
+    mps = Mps.random(model, 1, int(MODEL["bond_dim"]), percent=1.0)
+    mps.optimize_config.method = CALC["method"]
+    mps.optimize_config.procedure = [
+        [MODEL["bond_dim"], 0.4],
+        [MODEL["bond_dim"], 0.2],
+        [MODEL["bond_dim"], 0.1],
+        [MODEL["bond_dim"], 0],
+    ]
+    energies, _ = optimize_mps(mps.copy(), mpo)
+    print("lowest_energy=", min(energies))
+
+
+if __name__ == "__main__":
+    main()

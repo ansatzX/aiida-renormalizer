@@ -34,7 +34,8 @@ class ModelData(Data):
         Hamiltonian/dipole terms:
         - {"symbol": str, "dofs": str | list[str], "factor": float}
         """
-        from renormalizer.model import BasisHalfSpin, BasisSHO, Op
+        from renormalizer.model.basis import BasisHalfSpin, BasisSHO
+        from renormalizer.model import Op
         from renormalizer.model import Model as RenoModel
 
         basis_items = []

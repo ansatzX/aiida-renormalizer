@@ -1,0 +1,10 @@
+import base64
+from pathlib import Path
+
+output_path = Path("{{ output_path }}")
+output_path.parent.mkdir(parents=True, exist_ok=True)
+script_text = base64.b64decode("{{ script_text_b64 }}").decode("utf-8")
+output_path.write_text(script_text)
+
+print("generated_script=", output_path)
+print("generated_lines=", len(script_text.splitlines()))

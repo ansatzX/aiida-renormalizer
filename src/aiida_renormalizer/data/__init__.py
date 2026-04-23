@@ -1,6 +1,7 @@
 """Data node types for Renormalizer objects."""
 
 __all__ = [
+    "BasisSpecData",
     "BasisSetData",
     "BasisTreeData",
     "ConfigData",
@@ -8,7 +9,9 @@ __all__ = [
     "MPOData",
     "MPSData",
     "OpData",
+    "OpSpecData",
     "TensorNetworkLayoutData",
+    "TopologyData",
     "TTNOData",
     "TTNSData",
 ]
@@ -20,6 +23,10 @@ def __getattr__(name: str):
         from aiida_renormalizer.data.basis import BasisSetData
 
         return BasisSetData
+    if name == "BasisSpecData":
+        from aiida_renormalizer.data.basis_spec import BasisSpecData
+
+        return BasisSpecData
     if name == "BasisTreeData":
         from aiida_renormalizer.data.basis_tree import BasisTreeData
 
@@ -44,10 +51,18 @@ def __getattr__(name: str):
         from aiida_renormalizer.data.op import OpData
 
         return OpData
+    if name == "OpSpecData":
+        from aiida_renormalizer.data.op_spec import OpSpecData
+
+        return OpSpecData
     if name == "TensorNetworkLayoutData":
         from aiida_renormalizer.data.tensor_network_layout import TensorNetworkLayoutData
 
         return TensorNetworkLayoutData
+    if name == "TopologyData":
+        from aiida_renormalizer.data.topology import TopologyData
+
+        return TopologyData
     if name == "TTNOData":
         from aiida_renormalizer.data.ttno import TTNOData
 

@@ -1,0 +1,144 @@
+"""Driver script for BundleRunnerCalcJob."""
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+import traceback
+from pathlib import Path
+
+
+def _load_json(path: str) -> dict:
+    with open(path, "r") as handle:
+        return json.load(handle)
+
+
+def _dump_json(path: str, payload: dict) -> None:
+    with open(path, "w") as handle:
+        json.dump(payload, handle, indent=2)
+
+
+def _safe_stage_dir_name(index: int, name: str) -> str:
+    sanitized = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in name)
+    return f"stage_{index:02d}_{sanitized}"
+
+
+def _execute_stage(stage_index: int, stage_name: str, script: str, root: Path) -> dict:
+    stage_dir = root / _safe_stage_dir_name(stage_index, stage_name)
+    stdout_path = stage_dir / "stdout.log"
+    stderr_path = stage_dir / "stderr.log"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+
+    script_path = stage_dir / "stage.py"
+    script_path.write_text(script)
+
+    started = __import__("time").time()
+    cwd = os.getcwd()
+
+    try:
+        os.chdir(stage_dir)
+        with open("stdout.log", "a") as out, open("stderr.log", "a") as err:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                scope = {"__name__": "__main__", "__file__": str(script_path)}
+                exec(compile(script, str(script_path), "exec"), scope, scope)
+        elapsed = __import__("time").time() - started
+        return {
+            "name": stage_name,
+            "index": stage_index,
+            "status": "ok",
+            "elapsed_sec": elapsed,
+            "workdir": str(stage_dir),
+        }
+    except Exception:
+        elapsed = __import__("time").time() - started
+        traceback_text = traceback.format_exc()
+        with open(stderr_path, "a") as err:
+            err.write("\n=== TRACEBACK ===\n")
+            err.write(traceback_text)
+        return {
+            "name": stage_name,
+            "index": stage_index,
+            "status": "failed",
+            "elapsed_sec": elapsed,
+            "workdir": str(stage_dir),
+            "traceback": traceback_text,
+        }
+    finally:
+        os.chdir(cwd)
+
+
+def main() -> int:
+    manifest = _load_json("input_manifest.json")
+    control = _load_json("input_bundle_control.json")
+
+    stages = manifest["stages"]
+    resume_from = int(control.get("resume_from_stage", 1))
+    fail_fast = bool(control.get("fail_fast", True))
+
+    state_path = Path("bundle_state.json")
+    if state_path.exists():
+        state = _load_json(str(state_path))
+    else:
+        state = {
+            "completed": [],
+            "failed_stage": None,
+            "stage_results": [],
+        }
+
+    completed = set(state.get("completed", []))
+    results = list(state.get("stage_results", []))
+
+    bundle_log = Path("bundle.log")
+    with open(bundle_log, "a") as blog:
+        blog.write(f"Bundle start: stages={len(stages)} resume_from={resume_from}\n")
+
+    failed_stage = None
+
+    for idx, stage in enumerate(stages, start=1):
+        name = stage["name"]
+        script = stage["script"]
+
+        if idx < resume_from:
+            continue
+        if name in completed:
+            continue
+
+        result = _execute_stage(idx, name, script, Path("."))
+        results.append(result)
+
+        if result["status"] == "ok":
+            completed.add(name)
+            state["completed"] = sorted(completed)
+            state["failed_stage"] = None
+            state["stage_results"] = results
+            _dump_json(str(state_path), state)
+            continue
+
+        failed_stage = idx
+        state["failed_stage"] = idx
+        state["stage_results"] = results
+        _dump_json(str(state_path), state)
+        if fail_fast:
+            break
+
+    final = {
+        "calcjob_class": "BundleRunnerCalcJob",
+        "calc_type": "bundle_runner",
+        "schema": manifest.get("schema", "bundle_manifest_v1"),
+        "stage_count": len(stages),
+        "completed_stage_count": len(completed),
+        "completed_stages": sorted(completed),
+        "failed_stage": failed_stage,
+        "resume_from_stage": resume_from,
+        "fail_fast": fail_fast,
+        "converged": failed_stage is None,
+    }
+
+    _dump_json("stage_summary.json", {"stage_results": results})
+    _dump_json("output_parameters.json", final)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

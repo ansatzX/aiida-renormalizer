@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+"""Single-file MPS dynamics script (translated from ori_examples/dynamics.py)."""
+
+from __future__ import annotations
+
+import logging
+import os
+
+import yaml
+from renormalizer.model import load_from_dict
+from renormalizer.transport import ChargeDiffusionDynamics
+from renormalizer.utils import CompressConfig, EvolveConfig, EvolveMethod, log
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    with open(INPUT["param_file"]) as fin:
+        param = yaml.safe_load(fin)
+
+    log.register_file_output(os.path.join(param["output dir"], param["fname"] + ".log"), "w")
+    log.set_stream_level(logging.INFO)
+
+    model, temperature = load_from_dict(param, 3, False)
+    dynamics = ChargeDiffusionDynamics(
+        model,
+        temperature=temperature,
+        compress_config=CompressConfig(max_bonddim=16),
+        evolve_config=EvolveConfig(EvolveMethod.tdvp_ps, adaptive=True, guess_dt=2),
+        rdm=False,
+    )
+    dynamics.dump_dir = param["output dir"]
+    dynamics.job_name = param["fname"]
+    dynamics.custom_dump_info["comment"] = param["comment"]
+    print("preview_only=False: set evolve call as needed")
+
+
+if __name__ == "__main__":
+    main()

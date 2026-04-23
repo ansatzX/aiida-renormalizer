@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+"""Generated TTN dynamics script in gold-sample style."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from renormalizer.model import Op
+from renormalizer.model import basis as ba
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.tn import BasisTree, TTNO, TTNS
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+PARAMETER_SHEET = {{ parameter_sheet_literal }}
+ENVIRONMENT_MODEL_INFO = {{ environment_model_info_literal }}
+TENSOR_NETWORK_SPEC = {{ tensor_network_spec_literal }}
+DYNAMICS_PLAN = {{ dynamics_plan_literal }}
+COLLECT_DATA_PLAN = {{ collect_data_plan_literal }}
+REAL_RUN = {{ real_run_literal }}
+
+
+def build_environment_variables():
+    epsilon = float(PARAMETER_SHEET["epsilon"])
+    delta_eff = float(ENVIRONMENT_MODEL_INFO["delta_eff"])
+    nmodes = len(ENVIRONMENT_MODEL_INFO["omega_k"])
+    return epsilon, delta_eff, nmodes
+
+
+def build_model_with_op_and_basis():
+    spin_dof = TENSOR_NETWORK_SPEC["spin_dof"]
+    epsilon, delta_eff, nmodes = build_environment_variables()
+
+    ham_terms = []
+{{ system_hamiltonian_terms_block | indent(4, true) }}
+{{ environment_hamiltonian_terms_block | indent(4, true) }}
+{{ basis_spec_block | indent(4, true) }}
+
+    return basis, ham_terms
+
+
+def build_tree_topology(basis):
+    tree_type = TENSOR_NETWORK_SPEC["tree_type"]
+    if tree_type != "binary":
+        raise ValueError(f"unsupported tree_type for generated script: {tree_type}")
+    return BasisTree.binary(basis)
+
+
+def build_network_operators_and_state():
+    basis, ham_terms = build_model_with_op_and_basis()
+    basis_tree = build_tree_topology(basis)
+
+    ttno = TTNO(basis_tree, ham_terms)
+    spin_dof = TENSOR_NETWORK_SPEC["spin_dof"]
+    exp_z = TTNO(basis_tree, Op("sigma_z", spin_dof))
+    exp_x = TTNO(basis_tree, Op("sigma_x", spin_dof))
+
+    ttns = TTNS(basis_tree)
+    ttns.compress_config = CompressConfig(
+        CompressCriteria.fixed,
+        max_bonddim=int(TENSOR_NETWORK_SPEC["m_max"]),
+    )
+    ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
+    return ttns, ttno, exp_z, exp_x
+
+
+def run_core_solver_loop():
+    ttns, ttno, exp_z, exp_x = build_network_operators_and_state()
+    ttns.evolve_config = EvolveConfig(EvolveMethod(str(DYNAMICS_PLAN["method"])))
+
+    dt = float(DYNAMICS_PLAN["dt"])
+    nsteps = int(DYNAMICS_PLAN["nsteps"])
+    expectations = []
+    for _ in range(nsteps):
+        ttns = ttns.evolve(ttno, dt)
+        z = ttns.expectation(exp_z)
+        x = ttns.expectation(exp_x)
+        expectations.append((float(z), float(x)))
+    return expectations
+
+
+def main() -> None:
+    output_dir = Path(__file__).resolve().parent
+    _, _, nmodes = build_environment_variables()
+    if not REAL_RUN:
+        preview_payload = {
+            "message": "Preview mode: generated script is syntactically ready; set REAL_RUN=True to run dynamics.",
+            "parameter_sheet": PARAMETER_SHEET,
+            "mode_count": nmodes,
+            "tree_type": TENSOR_NETWORK_SPEC["tree_type"],
+            "m_max": TENSOR_NETWORK_SPEC["m_max"],
+            "preview_file": COLLECT_DATA_PLAN["preview_file"],
+        }
+        (output_dir / COLLECT_DATA_PLAN["preview_file"]).write_text(json.dumps(preview_payload, indent=2))
+        print("preview_only=True")
+        print("preview_file=", output_dir / COLLECT_DATA_PLAN["preview_file"])
+        return
+
+    expectations = run_core_solver_loop()
+    result_payload = {
+        "dt": float(DYNAMICS_PLAN["dt"]),
+        "nsteps": int(DYNAMICS_PLAN["nsteps"]),
+        "expectations": expectations,
+    }
+    (output_dir / COLLECT_DATA_PLAN["result_file"]).write_text(json.dumps(result_payload, indent=2))
+    print("preview_only=False")
+    print("result_file=", output_dir / COLLECT_DATA_PLAN["result_file"])
+
+
+if __name__ == "__main__":
+    main()

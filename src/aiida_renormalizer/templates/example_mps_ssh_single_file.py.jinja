@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+"""Single-file optical SSH script (translated from ori_examples/ssh.py)."""
+
+from __future__ import annotations
+
+from renormalizer.model.basis import BasisSHO, BasisSimpleElectron
+from renormalizer.model.model import Model, construct_j_matrix
+from renormalizer.model.op import Op
+from renormalizer.mps import Mpo, Mps
+from renormalizer.mps.gs import optimize_mps
+from renormalizer.utils import Quantity
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def build_symbolic_hamiltonian_terms_and_basis():
+    nsites = int(INPUT["nsites"])
+    j_matrix = construct_j_matrix(nsites, Quantity(float(INPUT["t"])), bool(MODEL["periodic"]))
+    basis = []
+    ham = []
+    for imol in range(nsites):
+        basis.append(BasisSimpleElectron(imol))
+        basis.append(BasisSHO((imol, 0), float(INPUT["w0"]), int(MODEL["nboson_max"])))
+    for imol in range(nsites):
+        for jmol in range(nsites):
+            if j_matrix[imol, jmol] != 0:
+                ham.append(Op(r"a^\dagger a", [imol, jmol], j_matrix[imol, jmol]))
+        ham.append(Op("b^\dagger b", (imol, 0), float(INPUT["w0"])))
+    return basis, ham
+
+
+def main() -> None:
+    basis, ham_terms = build_symbolic_hamiltonian_terms_and_basis()
+    model = Model(basis, ham_terms)
+    mpo = Mpo(model)
+    mps = Mps.random(model, 1, int(MODEL["bond_dim"]), percent=1.0)
+    mps.optimize_config.method = CALC["method"]
+    mps.optimize_config.procedure = [[MODEL["bond_dim"], 0.4], [MODEL["bond_dim"], 0.2], [MODEL["bond_dim"], 0.1], [MODEL["bond_dim"], 0]]
+    energies, _ = optimize_mps(mps.copy(), mpo)
+    print("lowest_energy=", min(energies))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+"""Single-file Hubbard script (translated from ori_examples/hubbard.py)."""
+
+from __future__ import annotations
+
+from renormalizer import Model, Mpo, Mps, optimize_mps
+from renormalizer.model.basis import BasisHalfSpin
+from renormalizer.model.op import Op
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def build_symbolic_hamiltonian_terms():
+    nsites = int(INPUT["nsites"])
+    t = float(INPUT["t"])
+    U = float(INPUT["U"])
+    qn_up = {"+": [-1, 0], "-": [1, 0], "Z": [0, 0]}
+    qn_do = {"+": [0, -1], "-": [0, 1], "Z": [0, 0]}
+
+    ham_terms = []
+    for i in range(2 * (nsites - 1)):
+        if i % 2 == 0:
+            qn1 = [qn_up["Z"], qn_up["+"], qn_do["Z"], qn_up["-"]]
+            qn2 = [qn_up["Z"], qn_up["-"], qn_do["Z"], qn_up["+"]]
+        else:
+            qn1 = [qn_do["Z"], qn_do["+"], qn_up["Z"], qn_do["-"]]
+            qn2 = [qn_do["Z"], qn_do["-"], qn_up["Z"], qn_do["+"]]
+        ham_terms.extend([
+            Op("Z + Z -", [i, i, i + 1, i + 2], factor=t, qn=qn1),
+            Op("Z - Z +", [i, i, i + 1, i + 2], factor=-t, qn=qn2),
+        ])
+
+    for i in range(0, 2 * nsites, 2):
+        qn = [qn_up["-"], qn_up["+"], qn_do["-"], qn_do["+"]]
+        ham_terms.append(Op("- + - +", [i, i, i + 1, i + 1], factor=U, qn=qn))
+
+    return ham_terms
+
+
+def main() -> None:
+    nsites = int(INPUT["nsites"])
+    basis = [BasisHalfSpin(i, sigmaqn=[[0, 0], [1, 0]] if i % 2 == 0 else [[0, 0], [0, 1]]) for i in range(2 * nsites)]
+    model = Model(basis, build_symbolic_hamiltonian_terms())
+    mpo = Mpo(model)
+    mps = Mps.random(model, MODEL["nelec"], int(MODEL["m_max"]), percent=1.0)
+    mps.optimize_config.method = CALC["method"]
+    mps.optimize_config.procedure = [[MODEL["m_max"], 0.4], [MODEL["m_max"], 0.2], [MODEL["m_max"], 0.1], [MODEL["m_max"], 0]]
+    energies, _ = optimize_mps(mps.copy(), mpo)
+    print("lowest_energy=", min(energies))
+
+
+if __name__ == "__main__":
+    main()

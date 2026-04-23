@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+"""Single-file SBM script (translated from ori_examples/sbm.py)."""
+
+from __future__ import annotations
+
+import logging
+
+from renormalizer.sbm import SpinBosonDynamics, param2mollist
+from renormalizer.utils import CompressConfig, EvolveConfig, Quantity, log
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    log.init_log(logging.INFO)
+    model = param2mollist(
+        float(INPUT["alpha"]),
+        Quantity(float(INPUT["raw_delta"])),
+        Quantity(float(INPUT["raw_omega_c"])),
+        float(MODEL["renormalization_p"]),
+        int(INPUT["n_phonons"]),
+    )
+    dynamics = SpinBosonDynamics(
+        model,
+        Quantity(0),
+        compress_config=CompressConfig(threshold=1e-4),
+        evolve_config=EvolveConfig(adaptive=True, guess_dt=0.1),
+        dump_dir="./",
+        job_name="sbm",
+    )
+    print("preview_only=False: set evolve call as needed", dynamics is not None)
+
+
+if __name__ == "__main__":
+    main()

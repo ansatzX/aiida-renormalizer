@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+"""Single-file TTN SBM FT script rendered from explicit operator/basis specs."""
+
+from __future__ import annotations
+
+import numpy as np
+from renormalizer.model import Op
+from renormalizer.model import basis as ba
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.sbm import ColeDavidsonSDF
+from renormalizer.tn import BasisTree, TTNO, TTNS, TreeNodeBasis
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def build_environment():
+    sdf = ColeDavidsonSDF(float(INPUT["ita"]), float(INPUT["omega_c"]), float(INPUT["beta"]), float(MODEL["upper_limit"]))
+    w, c2 = sdf.Wang1(int(MODEL["n_modes"]))
+    c = np.sqrt(c2)
+    delta_eff = float(MODEL["raw_delta"]) * sdf.reno(float(w[-1]))
+    theta_array = np.arctanh(np.exp(-w / float(INPUT["temperature"]) / 2))
+    return w, c, delta_eff, theta_array
+
+
+def build_model_with_op_and_basis():
+    spin_dof = "spin"
+    w, c, delta_eff, theta_array = build_environment()
+    ham_terms = []
+{{ hamiltonian_terms_block | indent(4, true) }}
+{{ basis_spec_block | indent(4, true) }}
+    return basis, ham_terms
+
+
+def main() -> None:
+    basis, ham_terms = build_model_with_op_and_basis()
+    root = BasisTree.binary_mctdh(
+        basis[1:],
+        contract_primitive=True,
+        contract_label=np.array({{ contract_label_literal }}, dtype=bool),
+        dummy_label="n",
+    ).root
+    root.add_child(TreeNodeBasis(basis[:1]))
+    basis_tree = BasisTree(root)
+
+    ttno = TTNO(basis_tree, ham_terms)
+    exp_z = TTNO(basis_tree, Op("sigma_z", "spin"))
+    exp_x = TTNO(basis_tree, Op("sigma_x", "spin"))
+    ttns = TTNS(basis_tree)
+    ttns.compress_config = CompressConfig(CompressCriteria.fixed, max_bonddim=int(MODEL["m_max"]))
+    ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
+    ttns.evolve_config = EvolveConfig(EvolveMethod.tdvp_ps)
+    print("preview_only=False: set evolve loop as needed", len(ttns), exp_z is not None, exp_x is not None)
+
+
+if __name__ == "__main__":
+    main()

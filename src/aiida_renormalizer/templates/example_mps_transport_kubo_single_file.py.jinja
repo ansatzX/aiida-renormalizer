@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+"""Single-file Kubo transport script (translated from ori_examples/transport_kubo.py)."""
+
+from __future__ import annotations
+
+import logging
+import os
+
+import yaml
+from renormalizer.model import load_from_dict
+from renormalizer.transport import TransportKubo
+from renormalizer.utils import CompressConfig, EvolveConfig, log
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    with open(INPUT["param_file"]) as fin:
+        param = yaml.safe_load(fin)
+
+    log.register_file_output(os.path.join(param["output dir"], param["fname"] + ".log"), "w")
+    log.set_stream_level(logging.INFO)
+
+    model, temperature = load_from_dict(param, 3, False)
+    transport = TransportKubo(
+        model,
+        temperature=temperature,
+        ievolve_config=EvolveConfig(adaptive=True, guess_dt=temperature.to_beta() / 1000j),
+        compress_config=CompressConfig(threshold=1e-4),
+        evolve_config=EvolveConfig(adaptive=True, guess_dt=2),
+        dump_dir=param["output dir"],
+        job_name=param["fname"] + "_autocorr",
+    )
+    print("preview_only=False: set evolve call as needed", transport is not None)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+"""Generated TTN zero-temperature SBM dynamics script."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from renormalizer.model import Op
+from renormalizer.model import basis as ba
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.tn import BasisTree, TTNO, TTNS
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+ENVIRONMENT = {{ environment_literal }}
+REAL_RUN = {{ real_run_literal }}
+
+{{ model_section }}
+
+{{ calculation_section }}
+
+
+def main() -> None:
+    output_dir = Path(__file__).resolve().parent
+    if not REAL_RUN:
+        preview_payload = {
+            "message": "Preview mode: generated script is ready; set REAL_RUN=True to run dynamics.",
+            "delta_eff": float(ENVIRONMENT["delta_eff"]),
+            "n_modes": int(ENVIRONMENT["n_modes"]),
+            "tree_type": TREE_TYPE,
+            "m_max": M_MAX,
+        }
+        (output_dir / "sbm_zt_preview.json").write_text(json.dumps(preview_payload, indent=2))
+        print("preview_only=True")
+        print("preview_file=", output_dir / "sbm_zt_preview.json")
+        return
+
+    expectations = run_core_solver_loop()
+    result_payload = {"dt": DT, "nsteps": NSTEPS, "expectations": expectations}
+    (output_dir / "sbm_zt_result.json").write_text(json.dumps(result_payload, indent=2))
+    print("preview_only=False")
+    print("result_file=", output_dir / "sbm_zt_result.json")
+
+
+if __name__ == "__main__":
+    main()

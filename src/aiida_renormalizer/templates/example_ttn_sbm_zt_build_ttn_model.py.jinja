@@ -1,0 +1,32 @@
+TREE_TYPE = {{ tree_type_literal }}
+M_MAX = {{ m_max_literal }}
+
+
+def build_model_with_op_and_basis():
+    delta_eff = float(ENVIRONMENT["delta_eff"])
+
+    ham_terms = []
+{{ hamiltonian_terms_block | indent(4, true) }}
+{{ basis_block | indent(4, true) }}
+
+    return basis, ham_terms
+
+
+def build_tree_topology(basis):
+    if TREE_TYPE != "binary":
+        raise ValueError(f"unsupported tree_type for generated script: {TREE_TYPE}")
+    return BasisTree.binary(basis)
+
+
+def build_network_operators_and_state():
+    basis, ham_terms = build_model_with_op_and_basis()
+    basis_tree = build_tree_topology(basis)
+
+    ttno = TTNO(basis_tree, ham_terms)
+    exp_z = TTNO(basis_tree, Op("sigma_z", {{ observable_spin_dof_literal }}))
+    exp_x = TTNO(basis_tree, Op("sigma_x", {{ observable_spin_dof_literal }}))
+
+    ttns = TTNS(basis_tree)
+    ttns.compress_config = CompressConfig(CompressCriteria.fixed, max_bonddim=M_MAX)
+    ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
+    return ttns, ttno, exp_z, exp_x

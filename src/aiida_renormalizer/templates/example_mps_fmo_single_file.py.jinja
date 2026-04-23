@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+"""Single-file FMO script (translated from ori_examples/fmo.py)."""
+
+from __future__ import annotations
+
+import json
+import logging
+
+import numpy as np
+from renormalizer.model import HolsteinModel, Mol, Phonon
+from renormalizer.transport import ChargeDiffusionDynamics, InitElectron
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod, Quantity, log
+from renormalizer.utils.constant import cm2au
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    log.init_log(logging.INFO)
+    with open(INPUT["sdf_file"]) as fin:
+        sdf_values = np.array(json.load(fin))
+
+    omegas_cm = np.linspace(2, 300, int(MODEL["n_phonons"]))
+    omegas_au = omegas_cm * cm2au
+    hr_factors = np.interp(omegas_cm, sdf_values[:, 0], sdf_values[:, 1])
+    hr_factors *= float(MODEL["total_hr"]) / hr_factors.sum()
+
+    lams = hr_factors * omegas_au
+    phonons = [Phonon.simplest_phonon(Quantity(o), Quantity(l), lam=True) for o, l in zip(omegas_au, lams)]
+
+    j_matrix_cm = np.array([[310, -98, 6, -6, 7, -12, -10, 38], [-98, 230, 30, 7, 2, 12, 5, 8], [6, 30, 0, -59, -2, -10, 5, 2], [-6, 7, -59, 180, -65, -17, -65, -2], [7, 2, -2, -65, 405, 89, -6, 5], [-12, 11, -10, -17, 89, 320, 32, -10], [-10, 5, 5, -64, -6, 32, 270, -11], [38, 8, 2, -2, 5, -10, -11, 505]])
+    j_matrix_au = j_matrix_cm * cm2au
+    mols = [Mol(Quantity(e), phonons) for e in np.diag(j_matrix_au)]
+    order = np.array([7, 5, 3, 1, 2, 4, 6]) - 1
+    model = HolsteinModel(list(np.array(mols)[order]), j_matrix_au[order][:, order])
+
+    dynamics = ChargeDiffusionDynamics(
+        model,
+        evolve_config=EvolveConfig(EvolveMethod.tdvp_ps, guess_dt=CALC["evolve_dt"]),
+        compress_config=CompressConfig(CompressCriteria.fixed, max_bonddim=32),
+        init_electron=InitElectron.fc,
+    )
+    print("preview_only=False: set evolve call as needed", dynamics is not None)
+
+
+if __name__ == "__main__":
+    main()

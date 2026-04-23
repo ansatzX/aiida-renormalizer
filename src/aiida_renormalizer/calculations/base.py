@@ -170,6 +170,22 @@ class RenoBaseCalcJob(CalcJob):
         context = self._get_template_context()
         return template.render(**context)
 
+    @classmethod
+    def render_driver_template_preview(cls, extra_context: dict | None = None) -> str:
+        """Render driver template without submission (example preview mode)."""
+        import os
+
+        from jinja2 import Environment, FileSystemLoader
+
+        template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template(cls._template_name)
+
+        context = {'calcjob_class': cls.__name__}
+        if extra_context:
+            context.update(extra_context)
+        return template.render(**context)
+
     def _get_template_context(self) -> dict:
         """Provide context for Jinja2 template rendering.
 

@@ -144,3 +144,8 @@ Renormalizer/
 ori_examples/
 
 scripts/
+.zread/
+
+# Example generation artifacts
+examples/**/generated_scripts/
+examples/**/generated_snippets/

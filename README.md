@@ -1,264 +1,76 @@
 # aiida-renormalizer
 
-AiiDA plugin for Renormalizer tensor-network workflows.
+## Refactor Status (WIP)
 
-## What This Plugin Does
+This repository is **currently under active refactor** toward a research-first, composable architecture.
 
-- Data nodes for models, operators, MPO/MPS/TTNO/TTNS
-- CalcJobs for DMRG, TDVP, spectra, transport, TTN operations
-- WorkChains for multi-step workflows
+Current guidance:
 
-User interfaces: AiiDA Python API, `verdi run ...`
+1. API/process interfaces may still change without compatibility guarantees.
+2. Prefer using `examples/mps/*` and `examples/ttn/*` as the current reference path.
+3. Legacy paths/modules are being incrementally removed or rewritten.
+4. Generated-script workflow (`REAL_RUN=False`) is the recommended validation path during refactor.
 
-## Storage Model
+AiiDA plugin refactored for **research-oriented composable execution**:
+`workfunction (Jinja code generation) + BundleRunnerCalcJob + BundleRunnerWorkChain`.
 
-Wavefunction payloads (MPS/TTNS) stored externally. AiiDA tracks provenance and metadata.
+## Process Layer (Strict)
 
-## Installation
+AiiDA process layer exposes only:
 
-### Runtime
+1. `BundleRunnerCalcJob`
+2. `BundleRunnerWorkChain`
+3. code-generation workfunctions in `aiida_renormalizer.calcfunctions`
 
-```bash
-pip install git+https://github.com/ansatzX/aiida-renormalizer
-```
+No nested WorkChain orchestration is used in active process paths.
 
-### Development
+## Core Design
 
-```bash
-git clone https://github.com/ansatzX/aiida-renormalizer.git
-cd aiida-renormalizer
-pip install -e ".[dev]"
-```
+1. Generation-first examples (`REAL_RUN=False` by default)
+- Examples generate editable single-file scripts first.
+- Heavy compute execution is optional.
 
-## AiiDA Setup
+2. Symbolic model construction
+- Scripts explicitly define `INPUT`, `MODEL`, `CALC`.
+- Hamiltonian construction is symbolic and visible in generated script.
 
-For production usage, use PostgreSQL plus RabbitMQ.
+3. Composable bricks
+- Spectral parameters
+- Renormalization/discretization
+- Symbolic Hamiltonian terms
+- Tensor-network construction
+- Dynamics
 
-### Conda example (Linux)
-
-```bash
-conda create -n aiida -c conda-forge python=3.12 aiida-core=2.7.3 aiida-core.services postgresql "numpy<2.0"
-conda activate aiida
-
-# Initialize and start PostgreSQL inside the conda environment
-mkdir -p "$CONDA_PREFIX/var/postgresql"
-initdb -D "$CONDA_PREFIX/var/postgresql"
-pg_ctl -D "$CONDA_PREFIX/var/postgresql" -l "$CONDA_PREFIX/var/postgresql/logfile" start
-
-# Start services
-verdi presto
-```
-
-Notes:
-
-- On Linux, `aiida-core.services` can manage PostgreSQL and RabbitMQ.
-
-### Conda example (macOS)
-
-```bash
-conda create -n aiida -c conda-forge python=3.12 aiida-core=2.7.3 postgresql rabbitmq-server "numpy<2.0"
-conda activate aiida
-
-# Initialize and start PostgreSQL inside the conda environment
-mkdir -p "$CONDA_PREFIX/var/postgresql"
-initdb -D "$CONDA_PREFIX/var/postgresql"
-pg_ctl -D "$CONDA_PREFIX/var/postgresql" -l "$CONDA_PREFIX/var/postgresql/logfile" start
-
-# Start RabbitMQ broker
-rabbitmq-server -detached
-rabbitmqctl await_startup
-```
-
-Notes:
-
-- On macOS, do not rely on `aiida-core.services` due to dependency/platform issues.
-- `rabbitmq-server` is the RabbitMQ broker daemon required by AiiDA daemon/task transport.
-- If `rabbitmq-server -detached` fails with an address/port error, check:
-  `rabbitmq-diagnostics -q ping`
-
-### Create database and profile
-
-```bash
-createuser -s aiida
-createdb -O aiida aiida
-verdi quicksetup \
-  --profile default \
-  --email "you@example.com" \
-  --first-name "Your" \
-  --last-name "Name" \
-  --institution "Your Org" \
-  --db-engine postgresql_psycopg \
-  --db-backend core.psql_dos \
-  --db-username aiida \
-  --db-name aiida \
-  --db-hostname localhost \
-  --db-port 5432 \
-  --non-interactive
-verdi daemon start
-```
+4. Reusable topology datatype
+- `TopologyData` stores reusable tensor-network topology skeleton metadata to avoid repeated topology reconstruction setup.
 
 ## Examples
 
-22 example scripts organized into `calcjob/` (low-level) and `workchain/` (high-level) with mirrored MPS/TTN cases.
+Unified migrated layout:
 
-TTN example:
-```bash
-verdi run examples/workchain/ttn/sbm_zt/run_one_shot.py
-```
+- `examples/mps/*` from `ori_examples/*.py`
+- `examples/ttn/*` from `ori_examples/ttns/*.py`
 
-MPS example:
-```bash
-verdi run examples/workchain/mps/sbm/run_one_shot.py
-```
-
-## Publication Bundles
-
-Wavefunction artifacts are stored externally. Publication bundles can be created with provenance metadata and artifact manifests for sharing/archiving.
-
-CLI export command (`verdi reno bundle ...`) is temporarily disabled during API refactor.
-
-## Current Scope
-
-- Data types: ModelData, MPSData, MPOData, OpData, BasisSetData, ConfigData, BasisTreeData, TensorNetworkLayoutData, TTNSData, TTNOData
-- Parsers: RenoBaseParser, ScriptedParser
-- Examples: 22 scripts in `calcjob/` and `workchain/`
-
-### CalcJobs (33 total)
-
-```mermaid
-graph TB
-    subgraph L1[L1 Atomic]
-        A1[BuildMPO]
-        A2[Expectation]
-        A3[Compress]
-        A4[MaxEntangledMpdm]
-        A5[ModelFromSymbolicSpec]
-    end
-
-    subgraph L15[L1.5 LEGO]
-        L1[ComputeOccupations]
-        L2[ComputeMsd]
-    end
-
-    subgraph L2[L2 Composite]
-        C1[DMRG]
-        C2[ImagTime]
-        C3[TDVP]
-        C4[ThermalProp]
-        C5[Property]
-    end
-
-    subgraph Spectra[L2 Spectra/Transport]
-        S1[SpectraZeroT]
-        S2[SpectraFiniteT]
-        S3[Kubo]
-        S4[CorrectionVector]
-        S5[ChargeDiffusion]
-        S6[SpectralFunction]
-    end
-
-    subgraph Bath[Bath Pipeline]
-        B1[BathSpectralDensity]
-        B2[OhmicRenormModes]
-        B3[BathDiscretization]
-        B4[BathSpinBosonModel]
-        B5[SbmSymbolicSpecFromModes]
-        B6[BathToMPOCoeff]
-    end
-
-    subgraph TTN[TTN]
-        T1[OptimizeTTNS]
-        T2[TTNSymbolicModel]
-        T3[TTNSEvolve]
-        T4[TTNSSymbolicEvolve]
-        T5[TTNSExpectation]
-        T6[TTNSEntropy]
-        T7[TTNSMutualInfo]
-        T8[TTNSRdm]
-    end
-
-    subgraph L3[L3 Scripted]
-        SC[RenoScriptCalcJob]
-    end
-```
-
-### WorkChains (28 total)
-
-```mermaid
-graph TB
-    subgraph Core[Core]
-        W1[RenoRestartWorkChain]
-        W2[TimeEvolutionWorkChain]
-        W3[GroundStateWorkChain]
-        W4[AbsorptionWorkChain]
-        W5[ConvergenceWorkChain]
-    end
-
-    subgraph Extended[Extended]
-        W6[ThermalStateWorkChain]
-        W7[KuboTransportWorkChain]
-        W8[CustomPipelineWorkChain]
-    end
-
-    subgraph Sweeps[Sweep WorkChains]
-        W9[ParameterSweepWorkChain]
-        W10[TemperatureSweepWorkChain]
-        W11[BondDimensionSweepWorkChain]
-        W12[FrequencySweepWorkChain]
-    end
-
-    subgraph Advanced[Advanced Dynamics]
-        W13[CorrectionVectorWorkChain]
-        W14[ChargeDiffusionWorkChain]
-    end
-
-    subgraph Bath[Bath Pipelines]
-        W15[BathMPOPipelineWorkChain]
-        W16[BathSpinBosonModelWorkChain]
-        W17[OhmicRenormModesWorkChain]
-        W18[SbmModelFromModesWorkChain]
-        W19[ModelToMPOWorkChain]
-        W20[MPOToInitialMPSWorkChain]
-        W21[MPSDynamicsWorkChain]
-    end
-
-    subgraph Models[Model WorkChains]
-        W22[SpinBosonWorkChain]
-        W23[VibronicWorkChain]
-    end
-
-    subgraph TTN[TTN WorkChains]
-        W24[TTNGroundStateWorkChain]
-        W25[TTNTimeEvolutionWorkChain]
-        W26[TTNMPSComparisonWorkChain]
-        W27[TTNSymbolicModelWorkChain]
-        W28[TTNSymbolicDynamicsWorkChain]
-    end
-```
-
-## Tests
-
-Run the plugin suite from the package directory:
+Representative runs:
 
 ```bash
-cd aiida-renormalizer
-uv run python -m pytest -q tests
+python examples/mps/hubbard/run_one_shot.py
+python examples/ttn/sbm_zt/run_one_shot.py
 ```
 
-## Requirements
+## Install
 
-- Python >= 3.9
-- `aiida-core==2.7.3`
-- `renormalizer`
-- `numpy<2.0`
+```bash
+pip install -e ".[dev]"
+```
 
-## Compatibility Notes
+## Test
 
-- The plugin drivers target current Renormalizer public APIs (`renormalizer.utils.configs`), not legacy `renormalizer.parameter`.
-- For AiiDA 2.7.3 environments, use `verdi run ...` for script-style launches.
-- The custom `verdi reno ...` CLI entrypoint is temporarily disabled during API refactor.
-- Some advanced Renormalizer branches are upstream-limited and may raise `NotImplementedError` depending on model/configuration (for example complex Kubo coupling paths).
+```bash
+pytest -q tests
+```
 
-## License
+## Entry points
 
-Not Setup now
+- Workflow: `reno.bundle_runner`
+- Calculation: `reno.bundle_runner`

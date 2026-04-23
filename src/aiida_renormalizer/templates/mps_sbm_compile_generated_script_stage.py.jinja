@@ -1,0 +1,6 @@
+import py_compile
+from pathlib import Path
+
+script_path = Path("{{ output_path }}")
+py_compile.compile(str(script_path), doraise=True)
+print("compiled_script=", script_path)

@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""Single-file TTN junction finite-temperature script (translated from ori_examples/ttns/junction_ft.py)."""
+
+from __future__ import annotations
+
+import numpy as np
+from renormalizer import BasisDummy, BasisHalfSpin, BasisSHO, Op, Quantity
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.sbm import ColeDavidsonSDF
+from renormalizer.tn import BasisTree, TTNO, TTNS, TreeNodeBasis
+from renormalizer.utils.configs import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    sdf = ColeDavidsonSDF(
+        Quantity(float(INPUT["ita_cm"]), "cm-1").as_au() / 2,
+        Quantity(float(INPUT["omega_c_cm"]), "cm-1").as_au(),
+        float(INPUT["beta"]),
+        Quantity(float(MODEL["upper_limit_ev"]), "eV").as_au(),
+    )
+    w, c2 = sdf.Wang1(int(INPUT["n_ph_mode"]))
+    c = np.sqrt(c2)
+
+    basis = [BasisHalfSpin("s")]
+    for i in range(int(INPUT["n_ph_mode"])):
+        basis.append(BasisSHO(f"v_{i}_p", w[i], 4))
+        basis.append(BasisSHO(f"v_{i}_q", w[i], 4))
+
+    ham_terms = [Op("+ -", "s", factor=0.0)]
+    for i in range(int(INPUT["n_ph_mode"])):
+        ham_terms.append(Op("sigma_z x", ["s", f"v_{i}_p"], factor=float(c[i]), qn=[0, 0]))
+        ham_terms.append(Op("sigma_z x", ["s", f"v_{i}_q"], factor=float(c[i]), qn=[0, 0]))
+
+    root = BasisTree.binary_mctdh(basis[1:], dummy_label="phonon-dummy").root
+    root.add_child(TreeNodeBasis([basis[0], BasisDummy("dummy")]))
+    basis_tree = BasisTree(root)
+
+    ttno = TTNO(basis_tree, ham_terms)
+    ttns = TTNS(basis_tree)
+    ttns.compress_config = CompressConfig(CompressCriteria.fixed, max_bonddim=int(MODEL["m_max"]))
+    ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
+    ttns.evolve_config = EvolveConfig(EvolveMethod.tdvp_ps)
+    print("preview_only=False: set evolve loop as needed", len(ttns))
+
+
+if __name__ == "__main__":
+    main()

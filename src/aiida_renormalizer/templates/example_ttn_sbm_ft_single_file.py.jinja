@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+"""Single-file TTN SBM FT script (translated from ori_examples/ttns/sbm_ft.py)."""
+
+from __future__ import annotations
+
+import numpy as np
+from renormalizer.model import Op
+from renormalizer.model import basis as ba
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.sbm import ColeDavidsonSDF
+from renormalizer.tn import BasisTree, TTNO, TTNS, TreeNodeBasis
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+INPUT = {{ input_literal }}
+MODEL = {{ model_literal }}
+CALC = {{ calc_literal }}
+
+
+def main() -> None:
+    sdf = ColeDavidsonSDF(float(INPUT["ita"]), float(INPUT["omega_c"]), float(INPUT["beta"]), float(MODEL["upper_limit"]))
+    w, c2 = sdf.Wang1(int(MODEL["n_modes"]))
+    c = np.sqrt(c2)
+    delta_eff = float(MODEL["delta"]) * sdf.reno(float(w[-1]))
+
+    ham_terms = [Op("sigma_z", "spin", factor=float(MODEL["epsilon"]), qn=0), Op("sigma_x", "spin", factor=delta_eff, qn=0)]
+    theta_array = np.arctanh(np.exp(-w / float(INPUT["temperature"]) / 2))
+
+    for imode in range(int(MODEL["n_modes"])):
+        ham_terms.extend([
+            Op("p^2", f"v_{imode}_p", factor=0.5, qn=0),
+            Op("x^2", f"v_{imode}_p", factor=0.5 * w[imode] ** 2, qn=0),
+            Op("p^2", f"v_{imode}_q", factor=-0.5, qn=0),
+            Op("x^2", f"v_{imode}_q", factor=-0.5 * w[imode] ** 2, qn=0),
+            Op("sigma_z x", ["spin", f"v_{imode}_p"], factor=np.cosh(theta_array[imode]) * c[imode], qn=[0, 0]),
+            Op("sigma_z x", ["spin", f"v_{imode}_q"], factor=np.sinh(theta_array[imode]) * c[imode], qn=[0, 0]),
+        ])
+
+    basis = [ba.BasisHalfSpin("spin", [0, 0])]
+    for imode in range(int(MODEL["n_modes"])):
+        basis.append(ba.BasisSHO(f"v_{imode}_p", w[imode], 4))
+        basis.append(ba.BasisSHO(f"v_{imode}_q", w[imode], 4))
+
+    root = BasisTree.binary_mctdh(basis[1:], contract_primitive=True, contract_label=np.ones(2 * int(MODEL["n_modes"]), dtype=bool), dummy_label="n").root
+    root.add_child(TreeNodeBasis(basis[:1]))
+    basis_tree = BasisTree(root)
+
+    ttno = TTNO(basis_tree, ham_terms)
+    ttns = TTNS(basis_tree)
+    ttns.compress_config = CompressConfig(CompressCriteria.fixed, max_bonddim=int(MODEL["m_max"]))
+    ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
+    ttns.evolve_config = EvolveConfig(EvolveMethod.tdvp_ps)
+    print("preview_only=False: set evolve loop as needed", len(ttns))
+
+
+if __name__ == "__main__":
+    main()
