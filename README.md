@@ -4,6 +4,10 @@
 
 This repository is **currently under active refactor** toward a research-first, composable architecture.
 
+This repo rely on renormalizer which is with numpy1 & cupy. 
+I am working on improve backend of RENO to np1 np2 cupy jax and cupy
+[backend fast rector](https://github.com/ansatzX/Renormalizer/tree/backend). Then this project will continue.
+
 Current guidance:
 
 1. API/process interfaces may still change without compatibility guarantees.
