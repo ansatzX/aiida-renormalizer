@@ -22,7 +22,7 @@ load_profile()
 
 CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = False
+REAL_RUN = True
 DEBUG_PROVENANCE = False
 FAIL_FAST = True
 MAX_RETRIES = 0
@@ -61,21 +61,21 @@ def main() -> None:
     for imol in range(NSITES):
         for jmol in range(NSITES):
             if j_matrix[imol, jmol] != 0:
-                ops.append(Op(r"a^\\dagger a", [imol, jmol], j_matrix[imol, jmol]))
-        ops.append(Op(r"b^\\dagger b", (imol, 0), W0))
+                ops.append(Op(r"a^\dagger a", [imol, jmol], j_matrix[imol, jmol]))
+        ops.append(Op(r"b^\dagger b", (imol, 0), W0))
 
     for imol in range(NSITES - 1):
-        ops.append(Op(r"a^\\dagger a", [imol, imol + 1], G) * Op(r"b^\\dagger+b", (imol + 1, 0)))
-        ops.append(Op(r"a^\\dagger a", [imol, imol + 1], -G) * Op(r"b^\\dagger+b", (imol, 0)))
-        ops.append(Op(r"a^\\dagger a", [imol + 1, imol], G) * Op(r"b^\\dagger+b", (imol + 1, 0)))
-        ops.append(Op(r"a^\\dagger a", [imol + 1, imol], -G) * Op(r"b^\\dagger+b", (imol, 0)))
+        ops.append(Op(r"a^\dagger a", [imol, imol + 1], G) * Op(r"b^\dagger+b", (imol + 1, 0)))
+        ops.append(Op(r"a^\dagger a", [imol, imol + 1], -G) * Op(r"b^\dagger+b", (imol, 0)))
+        ops.append(Op(r"a^\dagger a", [imol + 1, imol], G) * Op(r"b^\dagger+b", (imol + 1, 0)))
+        ops.append(Op(r"a^\dagger a", [imol + 1, imol], -G) * Op(r"b^\dagger+b", (imol, 0)))
 
     if PERIODIC:
         last = NSITES - 1
-        ops.append(Op(r"a^\\dagger a", [last, 0], G) * Op(r"b^\\dagger+b", (0, 0)))
-        ops.append(Op(r"a^\\dagger a", [last, 0], -G) * Op(r"b^\\dagger+b", (last, 0)))
-        ops.append(Op(r"a^\\dagger a", [0, last], G) * Op(r"b^\\dagger+b", (0, 0)))
-        ops.append(Op(r"a^\\dagger a", [0, last], -G) * Op(r"b^\\dagger+b", (last, 0)))
+        ops.append(Op(r"a^\dagger a", [last, 0], G) * Op(r"b^\dagger+b", (0, 0)))
+        ops.append(Op(r"a^\dagger a", [last, 0], -G) * Op(r"b^\dagger+b", (last, 0)))
+        ops.append(Op(r"a^\dagger a", [0, last], G) * Op(r"b^\dagger+b", (0, 0)))
+        ops.append(Op(r"a^\dagger a", [0, last], -G) * Op(r"b^\dagger+b", (last, 0)))
 
     serialized_opsum = [list(op.to_tuple()) for op in ops]
 
@@ -109,27 +109,26 @@ def main() -> None:
         work_dir=WORK_DIR,
     )
 
+    out = materialize_python_script_bundle_preview(
+        example_file=__file__,
+        work_dir=WORK_DIR,
+        script_name=script_name,
+        script_text=script_text,
+        manifest=manifest,
+    )
+    if DEBUG_PROVENANCE:
+        for label, node in [
+            ("define_hamiltonian_terms", hamiltonian_terms_node),
+            ("define_basis", basis_node),
+            ("build_mps_script", script_node),
+            ("build_bundle_manifest", manifest_node),
+        ]:
+            if node is not None:
+                print(f"[{label}] pk={node.pk}")
+    print(f"[preview] wrote 4 scripts to {out}")
+    print(f"work_dir={WORK_DIR}")
     if not REAL_RUN:
-        out = materialize_python_script_bundle_preview(
-            example_file=__file__,
-            work_dir=WORK_DIR,
-            script_name=script_name,
-            script_text=script_text,
-            manifest=manifest,
-        )
-        if DEBUG_PROVENANCE:
-            for label, node in [
-                ("define_hamiltonian_terms", hamiltonian_terms_node),
-                ("define_basis", basis_node),
-                ("build_mps_script", script_node),
-                ("build_bundle_manifest", manifest_node),
-            ]:
-                if node is not None:
-                    print(f"[{label}] pk={node.pk}")
-        print(f"[preview] wrote 4 scripts to {out}")
-        print(f"work_dir={WORK_DIR}")
         return
-
     outputs, node = run_process(
         BundleRunnerWorkChain,
         code=orm.load_code(CODE),

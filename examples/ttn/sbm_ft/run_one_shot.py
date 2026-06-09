@@ -23,7 +23,7 @@ load_profile()
 
 CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = False
+REAL_RUN = True
 DEBUG_PROVENANCE = False
 FAIL_FAST = True
 MAX_RETRIES = 0
@@ -159,30 +159,29 @@ def main() -> None:
         work_dir=WORK_DIR,
     )
 
+    out = materialize_python_script_bundle_preview(
+        example_file=__file__,
+        work_dir=WORK_DIR,
+        script_name=script_name,
+        script_text=script_text,
+        manifest=manifest,
+    )
+    if DEBUG_PROVENANCE:
+        for label, node in [
+            ("gather_known_parameters", known_node),
+            ("extract_spectral_density_parameters", spectral_node),
+            ("build_environment_modes", renorm_node),
+            ("define_hamiltonian_terms", hamiltonian_terms_node),
+            ("define_basis", basis_node),
+            ("build_ttn_script", script_node),
+            ("build_bundle_manifest", manifest_node),
+        ]:
+            if node is not None:
+                print(f"[{label}] pk={node.pk}")
+    print(f"[preview] wrote 4 scripts to {out}")
+    print(f"work_dir={WORK_DIR}")
     if not REAL_RUN:
-        out = materialize_python_script_bundle_preview(
-            example_file=__file__,
-            work_dir=WORK_DIR,
-            script_name=script_name,
-            script_text=script_text,
-            manifest=manifest,
-        )
-        if DEBUG_PROVENANCE:
-            for label, node in [
-                ("gather_known_parameters", known_node),
-                ("extract_spectral_density_parameters", spectral_node),
-                ("build_environment_modes", renorm_node),
-                ("define_hamiltonian_terms", hamiltonian_terms_node),
-                ("define_basis", basis_node),
-                ("build_ttn_script", script_node),
-                ("build_bundle_manifest", manifest_node),
-            ]:
-                if node is not None:
-                    print(f"[{label}] pk={node.pk}")
-        print(f"[preview] wrote 4 scripts to {out}")
-        print(f"work_dir={WORK_DIR}")
         return
-
     outputs, node = run_process(
         BundleRunnerWorkChain,
         code=orm.load_code(CODE),

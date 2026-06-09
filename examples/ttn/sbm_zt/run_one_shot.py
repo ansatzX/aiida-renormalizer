@@ -21,7 +21,7 @@ load_profile()
 
 CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = False
+REAL_RUN = True
 DEBUG_PROVENANCE = False
 FAIL_FAST = True
 MAX_RETRIES = 0
@@ -52,7 +52,7 @@ UPPER_LIMIT = 30.0
 # CALC: dynamics settings.
 DT = 0.2
 NSTEPS = 200
-METHOD = "tdvp_ps"
+METHOD = "TDVP PS one-site"
 
 
 # Workflow wiring below this line.
@@ -132,29 +132,28 @@ def main() -> None:
     script_text = script_payload["script_text"]
     manifest = bundle_outputs["manifest"]
 
+    out = materialize_python_script_bundle_preview(
+        example_file=__file__,
+        work_dir=WORK_DIR,
+        script_name=script_name,
+        script_text=script_text,
+        manifest=manifest,
+    )
+    if DEBUG_PROVENANCE:
+        for label, node in [
+            ("ColeDavidsonSDF_setup", env_node),
+            ("define_hamiltonian_terms", hamiltonian_terms_node),
+            ("define_basis", basis_node),
+            ("build_ttn_model", model_section_node),
+            ("build_calculation", calculation_section_node),
+            ("build_bundle_manifest", bundle_node),
+        ]:
+            if node is not None:
+                print(f"[{label}] pk={node.pk}")
+    print(f"[preview] wrote 4 scripts to {out}")
+    print(f"work_dir={WORK_DIR}")
     if not REAL_RUN:
-        out = materialize_python_script_bundle_preview(
-            example_file=__file__,
-            work_dir=WORK_DIR,
-            script_name=script_name,
-            script_text=script_text,
-            manifest=manifest,
-        )
-        if DEBUG_PROVENANCE:
-            for label, node in [
-                ("ColeDavidsonSDF_setup", env_node),
-                ("define_hamiltonian_terms", hamiltonian_terms_node),
-                ("define_basis", basis_node),
-                ("build_ttn_model", model_section_node),
-                ("build_calculation", calculation_section_node),
-                ("build_bundle_manifest", bundle_node),
-            ]:
-                if node is not None:
-                    print(f"[{label}] pk={node.pk}")
-        print(f"[preview] wrote 4 scripts to {out}")
-        print(f"work_dir={WORK_DIR}")
         return
-
     outputs, node = run_process(
         BundleRunnerWorkChain,
         code=orm.load_code(CODE),

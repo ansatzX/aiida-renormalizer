@@ -25,7 +25,7 @@ load_profile()
 
 CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = False
+REAL_RUN = True
 DEBUG_PROVENANCE = False
 FAIL_FAST = True
 MAX_RETRIES = 0
@@ -46,7 +46,7 @@ M_MAX = 32
 # CALC: dynamics settings.
 DT_FS = 0.5
 NSTEPS = 100
-METHOD = "tdvp_ps"
+METHOD = "TDVP PS one-site"
 
 
 # Workflow wiring below this line.
@@ -121,8 +121,8 @@ def main() -> None:
 
         hamiltonian_terms_py.extend(
             [
-                ["+ " + "Z " * len(z_dofs) + "-", [mode] + z_dofs + ["s"], coupling, 0],
-                ["- " + "Z " * len(z_dofs) + "+", [mode] + z_dofs + ["s"], coupling, 0],
+                ["+ " + "Z " * len(z_dofs) + "-", [mode] + z_dofs + ["s"], coupling, [0] * (len(z_dofs) + 2)],
+                ["- " + "Z " * len(z_dofs) + "+", [mode] + z_dofs + ["s"], coupling, [0] * (len(z_dofs) + 2)],
             ]
         )
 
@@ -222,28 +222,27 @@ def main() -> None:
         work_dir=WORK_DIR,
     )
 
+    out = materialize_python_script_bundle_preview(
+        example_file=__file__,
+        work_dir=WORK_DIR,
+        script_name=script_name,
+        script_text=script_text,
+        manifest=manifest,
+    )
+    if DEBUG_PROVENANCE:
+        for label, node in [
+            ("define_hamiltonian_terms", hamiltonian_terms_node),
+            ("define_basis", basis_node),
+            ("build_topology", topology_node),
+            ("build_ttn_script", script_node),
+            ("build_bundle_manifest", manifest_node),
+        ]:
+            if node is not None:
+                print(f"[{label}] pk={node.pk}")
+    print(f"[preview] wrote 4 scripts to {out}")
+    print(f"work_dir={WORK_DIR}")
     if not REAL_RUN:
-        out = materialize_python_script_bundle_preview(
-            example_file=__file__,
-            work_dir=WORK_DIR,
-            script_name=script_name,
-            script_text=script_text,
-            manifest=manifest,
-        )
-        if DEBUG_PROVENANCE:
-            for label, node in [
-                ("define_hamiltonian_terms", hamiltonian_terms_node),
-                ("define_basis", basis_node),
-                ("build_topology", topology_node),
-                ("build_ttn_script", script_node),
-                ("build_bundle_manifest", manifest_node),
-            ]:
-                if node is not None:
-                    print(f"[{label}] pk={node.pk}")
-        print(f"[preview] wrote 4 scripts to {out}")
-        print(f"work_dir={WORK_DIR}")
         return
-
     outputs, node = run_process(
         BundleRunnerWorkChain,
         code=orm.load_code(CODE),
