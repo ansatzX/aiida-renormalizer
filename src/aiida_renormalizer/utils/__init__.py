@@ -7,6 +7,7 @@ from typing import Any, Callable, TypeVar
 import numpy as np
 from aiida import orm
 from aiida.engine import run_get_node
+from aiida.manage import manager
 from plumpy.ports import PortNamespace
 
 T = TypeVar("T")
@@ -63,11 +64,38 @@ def _coerce_inputs_for_ports(inputs: dict[str, Any], ports: PortNamespace) -> di
     return converted
 
 
+def _is_broker_connection_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        exc_type = type(current)
+        if exc_type.__name__ == "AMQPConnectionError" and exc_type.__module__.startswith("aiormq"):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _run_get_node_without_broker(process: Callable[..., T], **inputs) -> tuple[T, orm.ProcessNode]:
+    """Run locally when a configured broker is unavailable."""
+    process_manager = manager.get_manager()
+    previous_runner = getattr(process_manager, "_runner", None)
+    runner = process_manager.create_runner(communicator=None)
+    process_manager._runner = runner
+    try:
+        return run_get_node(process, **inputs)
+    finally:
+        process_manager._runner = previous_runner
+
+
 def run_process(process: Callable[..., T], *, debug_provenance: bool = False, **inputs) -> tuple[T, orm.ProcessNode]:
     """Run an AiiDA process with automatic coercion from Python/numpy scalars to AiiDA Data types."""
     spec = getattr(process, "spec", None)
     converted_inputs = _coerce_inputs_for_ports(inputs, spec().inputs) if callable(spec) else dict(inputs)
-    outputs, node = run_get_node(process, **converted_inputs)
+    try:
+        outputs, node = run_get_node(process, **converted_inputs)
+    except Exception as exc:
+        if not _is_broker_connection_error(exc):
+            raise
+        outputs, node = _run_get_node_without_broker(process, **converted_inputs)
     return outputs, node
 
 

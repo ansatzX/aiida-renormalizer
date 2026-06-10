@@ -175,12 +175,25 @@ def _render_hamiltonian_terms_block(term_specs: list[dict[str, Any]], *, spin_do
     for item in term_specs:
         factor = item["factor"]
         factor_literal = factor if isinstance(factor, str) else repr(factor)
+        qn = item.get("qn", 0)
+        if isinstance(qn, int):
+            qn_literal = repr([qn])
+        elif isinstance(qn, tuple):
+            qn_literal = repr([list(x) for x in qn])
+        else:
+            qn_literal = repr(qn)
+        # Broadcast singleton qn for compound symbols (e.g. "+ -" with shared dof)
+        symbol = item["symbol"]
+        split_symbol = symbol.replace(r"b^\\dagger + b", r"b^\\dagger+b").split(" ")
+        num_parts = len(split_symbol)
+        if num_parts > 1 and qn_literal.startswith("[") and qn_literal.count("[") == 1:
+            qn_literal = repr([qn if isinstance(qn, int) else qn[0]] * num_parts)
         rendered_terms.append(
             "Op("
-            f"{json.dumps(item['symbol'])}, "
+            f"{json.dumps(symbol)}, "
             f"{_render_python_dofs_expr(item['dofs'], spin_dof=spin_dof)}, "
             f"factor={factor_literal}, "
-            f"qn={repr(item.get('qn', 0))}"
+            f"qn={qn_literal}"
             ")"
         )
     return "ham_terms.extend([\n        " + ",\n        ".join(rendered_terms) + "\n    ])"

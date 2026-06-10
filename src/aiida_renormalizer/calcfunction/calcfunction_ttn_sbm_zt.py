@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import base64
 import json
-from pathlib import Path
+import math
+from pathlib import Path, PurePosixPath
 from pprint import pformat
 from typing import Any
 
@@ -15,11 +16,52 @@ from jinja2 import Environment, FileSystemLoader
 _TEMPLATE_ENV = Environment(
     loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates")),
 )
+_BUNDLE_RELATIVE_PATH_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789"
+    "._-/"
+)
+_EVOLVE_METHOD_ALIASES = {
+    "tdvp-ps": "tdvp_ps",
+    "tdvp_ps": "tdvp_ps",
+    "tdvp-ps2": "tdvp_ps2",
+    "tdvp_ps2": "tdvp_ps2",
+    "tdvp-vmf": "tdvp_vmf",
+    "tdvp_vmf": "tdvp_vmf",
+    "tdvp-mu-cmf": "tdvp_mu_cmf",
+    "tdvp_mu_cmf": "tdvp_mu_cmf",
+    "tdvp-mu-vmf": "tdvp_mu_vmf",
+    "tdvp_mu_vmf": "tdvp_mu_vmf",
+    "prop-and-compress": "prop_and_compress",
+    "prop_and_compress": "prop_and_compress",
+}
 
 
 def _render_stage_script(template_name: str, context: dict[str, Any]) -> str:
     template = _TEMPLATE_ENV.get_template(template_name)
     return template.render(**context).rstrip() + "\n"
+
+
+def _validate_bundle_relative_path(path: Any, *, label: str) -> str:
+    message = f"{label} must be a bundle-relative path without parent traversal"
+    if not isinstance(path, str) or not path:
+        raise ValueError(message)
+    if path.strip() != path or not path.strip():
+        raise ValueError(message)
+    if any(char not in _BUNDLE_RELATIVE_PATH_CHARS for char in path):
+        raise ValueError(message)
+    if "//" in path:
+        raise ValueError(message)
+
+    candidate = path
+    posix_path = PurePosixPath(candidate)
+    if posix_path.is_absolute():
+        raise ValueError(message)
+    parts = candidate.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise ValueError(message)
+    return PurePosixPath(*parts).as_posix()
 
 
 def _validate_stage_payload(raw: list) -> list[dict]:
@@ -58,33 +100,49 @@ def build_bundle_manifest_payload(stages: list[dict]) -> dict:
 def render_python_script_bundle_manifest_payload(
     script_name: str,
     script_text: str,
-    output_directory: str = "../generated_scripts",
+    output_directory: str = "generated_scripts",
+    *,
+    include_execute_stage: bool = False,
 ) -> dict:
-    if not script_name.strip():
-        raise ValueError("script_name must be non-empty")
     if not script_text.strip():
         raise ValueError("script_text must be non-empty")
-    if not output_directory.strip():
-        raise ValueError("output_directory must be non-empty")
 
+    safe_script_name = _validate_bundle_relative_path(script_name, label="script_name")
+    safe_output_directory = _validate_bundle_relative_path(
+        output_directory.rstrip("/"),
+        label="output_directory",
+    )
     script_text_b64 = base64.b64encode(script_text.encode("utf-8")).decode("ascii")
-    output_path = f"{output_directory.rstrip('/')}/{script_name}"
+    output_path = _validate_bundle_relative_path(
+        f"{safe_output_directory}/{safe_script_name}",
+        label="output_path",
+    )
     stages = [
         {
             "name": "write_generated_script",
             "script": _render_stage_script(
                 "ttn_sbm_zt_write_generated_script_stage.py.jinja",
-                {"output_path": output_path, "script_text_b64": script_text_b64},
+                {"output_path_literal": json.dumps(output_path), "script_text_b64": script_text_b64},
             ),
         },
         {
             "name": "compile_generated_script",
             "script": _render_stage_script(
                 "ttn_sbm_zt_compile_generated_script_stage.py.jinja",
-                {"output_path": output_path},
+                {"output_path_literal": json.dumps(output_path)},
             ),
         },
     ]
+    if include_execute_stage:
+        stages.append(
+            {
+                "name": "execute_generated_script",
+                "script": _render_stage_script(
+                    "ttn_sbm_zt_execute_generated_script_stage.py.jinja",
+                    {"output_path_literal": json.dumps(output_path)},
+                ),
+            }
+        )
     return build_bundle_manifest_payload(stages)
 
 
@@ -247,73 +305,197 @@ def ColeDavidsonSDF_setup(
 
 
 @calcfunction
-def define_hamiltonian_terms(hamiltonian_terms: orm.List):
-    """Normalize the full user-authored Hamiltonian term list for the TTN case."""
-    from aiida_renormalizer.data import OpSpecData
-
-    return OpSpecData.from_list(_normalize_op_specs(hamiltonian_terms.get_list()))
-
-
-def _first_half_spin_dof(basis_items: list[dict[str, Any]]) -> Any:
-    for item in basis_items:
-        if str(item.get("kind")) == "half_spin":
-            return item["dof"]
-    raise ValueError("basis must contain a half_spin item for expectation operators")
-
-
-@calcfunction
-def define_basis(basis: orm.List):
-    """Normalize user-authored basis items for the TTN case."""
-    from aiida_renormalizer.data import BasisSpecData
-
-    return BasisSpecData.from_list(basis.get_list())
-
-
-@calcfunction
 def build_ttn_model(
-    hamiltonian_terms,
-    basis,
+    hamiltonian_terms: orm.List,
+    basis: orm.List,
     tree_type: orm.Str,
     m_max: orm.Int,
 ) -> orm.Str:
     """Render the model-construction part of the TTN script."""
-    basis_items = basis.as_list()
-    observable_spin_dof = _first_half_spin_dof(basis_items)
+    term_items = _normalize_op_specs(hamiltonian_terms.get_list())
+    from aiida_renormalizer.data import BasisSpecData
+
+    basis_items = BasisSpecData.from_list(basis.get_list()).as_list()
     return orm.Str(
         _render_stage_script(
             "example_ttn_sbm_zt_build_ttn_model.py.jinja",
             {
                 "tree_type_literal": json.dumps(tree_type.value),
                 "m_max_literal": repr(int(m_max.value)),
-                "observable_spin_dof_literal": _render_python_dof_atom_expr(observable_spin_dof),
-                "hamiltonian_terms_block": _render_hamiltonian_terms_block(hamiltonian_terms.as_list()),
+                "hamiltonian_terms_block": _render_hamiltonian_terms_block(term_items),
                 "basis_block": _render_basis_spec_block(basis_items),
             },
         )
     )
 
 
-@calcfunction
-def build_dynamcis_calculation(
-    dt: orm.Float,
-    nsteps: orm.Int,
-    method: orm.Str,
-) -> orm.Str:
-    """Render the calculation part of the TTN script."""
-    return orm.Str(
-        _render_stage_script(
-            "example_ttn_sbm_zt_build_calculation.py.jinja",
-            {
-                "dt_literal": repr(float(dt.value)),
-                "nsteps_literal": repr(int(nsteps.value)),
-                "method_literal": json.dumps(method.value),
-            },
+def _validate_literal_payload(value: Any, path: str) -> None:
+    if value is None or isinstance(value, (str, bool)):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return
+        raise ValueError(f"{path} must not contain non-finite float values")
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_literal_payload(item, f"{path}[{index}]")
+        return
+    if isinstance(value, tuple):
+        for index, item in enumerate(value):
+            _validate_literal_payload(item, f"{path}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{path} dict keys must be strings")
+            _validate_literal_payload(item, f"{path}.{key}")
+        return
+    raise ValueError(f"{path} must contain only str, int, finite float, bool, None, list, tuple, or dict")
+
+
+class _DoubleQuotedLiteralString(str):
+    def __repr__(self) -> str:
+        return json.dumps(str(self))
+
+
+def _prefer_double_quoted_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return _DoubleQuotedLiteralString(value)
+    if isinstance(value, list):
+        return [_prefer_double_quoted_strings(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_prefer_double_quoted_strings(item) for item in value)
+    if isinstance(value, dict):
+        return {
+            _DoubleQuotedLiteralString(key): _prefer_double_quoted_strings(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _render_python_literal(value: Any) -> str:
+    _validate_literal_payload(value, "literal payload")
+    return pformat(_prefer_double_quoted_strings(value), sort_dicts=False)
+
+
+def _is_supported_observation_dof_atom(obj: Any) -> bool:
+    return (
+        (isinstance(obj, str) and bool(obj.strip()))
+        or (isinstance(obj, int) and not isinstance(obj, bool))
+        or (
+            isinstance(obj, tuple)
+            and all(_is_supported_observation_dof_atom(item) for item in obj)
         )
     )
 
 
-# Optional alias for callers using corrected spelling.
-build_calculation = build_dynamcis_calculation
+def _is_supported_observation_dofs(obj: Any) -> bool:
+    return _is_supported_observation_dof_atom(obj) or (
+        isinstance(obj, list) and bool(obj) and all(_is_supported_observation_dof_atom(item) for item in obj)
+    )
+
+
+def _normalize_evolve_method(raw_method: Any) -> tuple[str, str]:
+    if not isinstance(raw_method, str) or not raw_method.strip():
+        raise ValueError("time evolution method must be non-empty")
+    method_token = raw_method.strip()
+    method_name = _EVOLVE_METHOD_ALIASES.get(method_token)
+    if method_name is None:
+        raise ValueError(f"unsupported time evolution method: {method_token}")
+    return method_token, method_name
+
+
+def _normalize_time_evolution(
+    *,
+    dt: float,
+    nsteps: int,
+    method: str,
+    observations: list[Any],
+) -> dict[str, Any]:
+    dt_value = float(dt)
+    if not math.isfinite(dt_value) or dt_value <= 0:
+        raise ValueError("time evolution dt must be a finite positive number")
+
+    if isinstance(nsteps, bool) or not isinstance(nsteps, int) or nsteps <= 0:
+        raise ValueError("time evolution nsteps must be a positive integer")
+
+    method_token, method_name = _normalize_evolve_method(method)
+
+    if not isinstance(observations, list) or not observations:
+        raise ValueError("time evolution observations must be a non-empty list")
+
+    normalized_observations: list[dict[str, Any]] = []
+    seen_labels: set[str] = set()
+    for index, raw_observation in enumerate(observations):
+        if not isinstance(raw_observation, dict):
+            raise ValueError(f"time evolution observations[{index}] must be a dict")
+        if not {"label", "symbol", "dofs"}.issubset(raw_observation):
+            raise ValueError(f"time evolution observations[{index}] must contain label, symbol, and dofs")
+
+        raw_label = raw_observation["label"]
+        raw_symbol = raw_observation["symbol"]
+        label = raw_label.strip() if isinstance(raw_label, str) else ""
+        symbol = raw_symbol.strip() if isinstance(raw_symbol, str) else ""
+        if not label:
+            raise ValueError(f"time evolution observations[{index}].label must be non-empty")
+        if not symbol:
+            raise ValueError(f"time evolution observations[{index}].symbol must be non-empty")
+        if label in seen_labels:
+            raise ValueError(f"duplicate observation label: {label}")
+        if not _is_supported_observation_dofs(raw_observation["dofs"]):
+            raise ValueError(
+                f"time evolution observations[{index}].dofs must be a supported dof atom or list of dof atoms"
+            )
+
+        seen_labels.add(label)
+        normalized_item = dict(raw_observation)
+        normalized_item["label"] = label
+        normalized_item["symbol"] = symbol
+        normalized_item["dofs"] = raw_observation["dofs"]
+        normalized_item["qn"] = raw_observation.get("qn", 0)
+        _validate_literal_payload(normalized_item, f"time evolution observations[{index}]")
+        normalized_observations.append(normalized_item)
+
+    return {
+        "dt": dt_value,
+        "nsteps": int(nsteps),
+        "method_token": method_token,
+        "method_name": method_name,
+        "observations": normalized_observations,
+    }
+
+
+def _render_time_evolution_section(time_evolution: dict[str, Any]) -> str:
+    return _render_stage_script(
+        "example_ttn_sbm_zt_build_calculation.py.jinja",
+        {
+            "dt_literal": repr(float(time_evolution["dt"])),
+            "nsteps_literal": repr(int(time_evolution["nsteps"])),
+            "method_literal": json.dumps(time_evolution["method_token"]),
+            "evolve_method_name": time_evolution["method_name"],
+            "observation_specs_literal": _render_python_literal(time_evolution["observations"]),
+        },
+    )
+
+
+@calcfunction
+def build_time_evolution_section(
+    dt: orm.Float,
+    nsteps: orm.Int,
+    method: orm.Str,
+    observations: orm.List,
+) -> orm.Str:
+    """Render the time-evolution and observation part of the TTN script."""
+    time_evolution = _normalize_time_evolution(
+        dt=float(dt.value),
+        nsteps=int(nsteps.value),
+        method=method.value,
+        observations=observations.get_list(),
+    )
+    return orm.Str(_render_time_evolution_section(time_evolution))
+
 
 def _render_ttn_script_payload(
     *,
@@ -366,6 +548,51 @@ def _materialize_ttn_script_payload(
     )
 
 
+def _ttn_sbm_zt_artifact_records(*, work_dir: str, script_name: str, real_run: bool) -> list[dict[str, Any]]:
+    base = _validate_bundle_relative_path(work_dir.rstrip("/"), label="work_dir")
+    safe_script_name = _validate_bundle_relative_path(script_name, label="script_name")
+    records = [
+        {
+            "role": "generated_script",
+            "path": _validate_bundle_relative_path(
+                f"{base}/{safe_script_name}",
+                label="generated_script artifact path",
+            ),
+            "required": True,
+        }
+    ]
+    if real_run:
+        records.append(
+            {
+                "role": "result",
+                "path": _validate_bundle_relative_path(
+                    f"{base}/sbm_zt_result.json",
+                    label="result artifact path",
+                ),
+                "required": True,
+            }
+        )
+    else:
+        records.append(
+            {
+                "role": "preview",
+                "path": _validate_bundle_relative_path(
+                    f"{base}/sbm_zt_preview.json",
+                    label="preview artifact path",
+                ),
+                "required": True,
+            }
+        )
+    return records
+
+
+@calcfunction
+def _attach_artifact_records(manifest: orm.Dict, artifacts: orm.List) -> orm.Dict:
+    payload = manifest.get_dict()
+    payload["artifacts"] = artifacts.get_list()
+    return orm.Dict(dict=payload)
+
+
 @workfunction
 def build_bundle_manifest(
     environment: orm.ArrayData,
@@ -382,10 +609,22 @@ def build_bundle_manifest(
         real_run=real_run,
     )
     payload = script_payload.get_dict()
-    manifest = bundle_manifest_for_python_script(
-        script_name=orm.Str(payload["script_name"]),
-        script_text=orm.Str(payload["script_text"]),
-        work_dir=work_dir,
+    manifest_payload = render_python_script_bundle_manifest_payload(
+        script_name=payload["script_name"],
+        script_text=payload["script_text"],
+        output_directory=work_dir.value,
+        include_execute_stage=True,
+    )
+    manifest = _materialize_bundle_manifest(orm.List(list=manifest_payload["stages"]))
+    manifest = _attach_artifact_records(
+        manifest=manifest,
+        artifacts=orm.List(
+            list=_ttn_sbm_zt_artifact_records(
+                work_dir=work_dir.value,
+                script_name=payload["script_name"],
+                real_run=bool(real_run.value),
+            )
+        ),
     )
     return {
         "script_payload": script_payload,

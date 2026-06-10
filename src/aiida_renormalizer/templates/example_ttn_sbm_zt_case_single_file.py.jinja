@@ -35,7 +35,7 @@ def main() -> None:
         print("preview_file=", output_dir / "sbm_zt_preview.json")
         return
 
-    expectations = run_core_solver_loop()
+    expectations = run_execution_plan()
     result_payload = {"dt": DT, "nsteps": NSTEPS, "expectations": expectations}
     (output_dir / "sbm_zt_result.json").write_text(json.dumps(result_payload, indent=2))
     print("preview_only=False")

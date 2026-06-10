@@ -24,9 +24,7 @@ def _safe_stage_dir_name(index: int, name: str) -> str:
 
 
 def _execute_stage(stage_index: int, stage_name: str, script: str, root: Path) -> dict:
-    stage_dir = root / _safe_stage_dir_name(stage_index, stage_name)
-    stdout_path = stage_dir / "stdout.log"
-    stderr_path = stage_dir / "stderr.log"
+    stage_dir = (root / _safe_stage_dir_name(stage_index, stage_name)).resolve()
     stage_dir.mkdir(parents=True, exist_ok=True)
 
     script_path = stage_dir / "stage.py"
@@ -36,8 +34,8 @@ def _execute_stage(stage_index: int, stage_name: str, script: str, root: Path) -
     cwd = os.getcwd()
 
     try:
-        os.chdir(stage_dir)
-        with open("stdout.log", "a") as out, open("stderr.log", "a") as err:
+        os.chdir(root.resolve())
+        with open(stage_dir / "stdout.log", "a") as out, open(stage_dir / "stderr.log", "a") as err:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 scope = {"__name__": "__main__", "__file__": str(script_path)}
                 exec(compile(script, str(script_path), "exec"), scope, scope)
@@ -52,7 +50,7 @@ def _execute_stage(stage_index: int, stage_name: str, script: str, root: Path) -
     except Exception:
         elapsed = __import__("time").time() - started
         traceback_text = traceback.format_exc()
-        with open(stderr_path, "a") as err:
+        with open(stage_dir / "stderr.log", "a") as err:
             err.write("\n=== TRACEBACK ===\n")
             err.write(traceback_text)
         return {

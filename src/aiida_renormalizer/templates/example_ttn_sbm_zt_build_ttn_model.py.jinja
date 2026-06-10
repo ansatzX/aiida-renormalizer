@@ -23,10 +23,8 @@ def build_network_operators_and_state():
     basis_tree = build_tree_topology(basis)
 
     ttno = TTNO(basis_tree, ham_terms)
-    exp_z = TTNO(basis_tree, Op("sigma_z", {{ observable_spin_dof_literal }}))
-    exp_x = TTNO(basis_tree, Op("sigma_x", {{ observable_spin_dof_literal }}))
 
     ttns = TTNS(basis_tree)
     ttns.compress_config = CompressConfig(CompressCriteria.fixed, max_bonddim=M_MAX)
     ttns = expand_bond_dimension_general(ttns, ttno, ex_mps=None)
-    return ttns, ttno, exp_z, exp_x
+    return ttns, ttno, basis_tree

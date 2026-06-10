@@ -2,11 +2,30 @@
 from __future__ import annotations
 
 import json
+from pathlib import PurePosixPath
 
 from aiida import orm
 from aiida.engine import CalcJobProcessSpec
 
 from aiida_renormalizer.calculations.base import RenoBaseCalcJob
+
+
+def _validate_bundle_relative_path(path: object, *, label: str) -> str:
+    message = f"{label} must be a bundle-relative path without parent traversal"
+    if not isinstance(path, str) or not path:
+        raise ValueError(message)
+    if path.strip() != path or not path.strip():
+        raise ValueError(message)
+    if "//" in path:
+        raise ValueError(message)
+
+    posix_path = PurePosixPath(path)
+    if posix_path.is_absolute():
+        raise ValueError(message)
+    parts = path.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise ValueError(message)
+    return PurePosixPath(*parts).as_posix()
 
 
 class BundleRunnerCalcJob(RenoBaseCalcJob):
@@ -86,7 +105,7 @@ class BundleRunnerCalcJob(RenoBaseCalcJob):
             )
 
     def _get_retrieve_list(self) -> list[str]:
-        return [
+        retrieve_list = [
             "output_parameters.json",
             "bundle_state.json",
             "stage_summary.json",
@@ -94,3 +113,22 @@ class BundleRunnerCalcJob(RenoBaseCalcJob):
             "aiida.out",
             "aiida.err",
         ]
+        manifest = self.inputs.manifest.get_dict()
+        artifacts = manifest.get("artifacts")
+        if artifacts is None:
+            return retrieve_list
+        if not isinstance(artifacts, list):
+            raise ValueError("manifest.artifacts must be a list")
+
+        seen = set(retrieve_list)
+        for index, artifact in enumerate(artifacts):
+            if not isinstance(artifact, dict):
+                raise ValueError(f"manifest.artifacts[{index}] must be a dict")
+            path = _validate_bundle_relative_path(
+                artifact.get("path"),
+                label=f"manifest.artifacts[{index}].path",
+            )
+            if artifact.get("required") is True and path not in seen:
+                retrieve_list.append(path)
+                seen.add(path)
+        return retrieve_list

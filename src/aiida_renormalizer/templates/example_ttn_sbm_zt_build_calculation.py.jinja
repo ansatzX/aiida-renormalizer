@@ -1,16 +1,34 @@
 DT = {{ dt_literal }}
 NSTEPS = {{ nsteps_literal }}
 METHOD = {{ method_literal }}
+EVOLVE_METHOD = EvolveMethod.{{ evolve_method_name }}
+OBSERVATION_SPECS = {{ observation_specs_literal }}
+
+
+def build_observation_operators(basis_tree):
+    observation_operators = {}
+    for item in OBSERVATION_SPECS:
+        observation_operators[item["label"]] = TTNO(
+            basis_tree,
+            Op(item["symbol"], item["dofs"], factor=item.get("factor", 1.0), qn=item.get("qn", 0)),
+        )
+    return observation_operators
+
+
+def run_execution_plan():
+    ttns, ttno, basis_tree = build_network_operators_and_state()
+    ttns.evolve_config = EvolveConfig(EVOLVE_METHOD)
+    observation_operators = build_observation_operators(basis_tree)
+
+    rows = []
+    for step in range(1, NSTEPS + 1):
+        ttns = ttns.evolve(ttno, DT)
+        row = {"step": step, "time": step * DT}
+        for label, operator in observation_operators.items():
+            row[label] = float(ttns.expectation(operator))
+        rows.append(row)
+    return rows
 
 
 def run_core_solver_loop():
-    ttns, ttno, exp_z, exp_x = build_network_operators_and_state()
-    ttns.evolve_config = EvolveConfig(EvolveMethod(METHOD))
-
-    expectations = []
-    for _ in range(NSTEPS):
-        ttns = ttns.evolve(ttno, DT)
-        z = ttns.expectation(exp_z)
-        x = ttns.expectation(exp_x)
-        expectations.append((float(z), float(x)))
-    return expectations
+    return run_execution_plan()

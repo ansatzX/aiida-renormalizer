@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+import runpy
+from pathlib import Path
+
+root = Path.cwd().resolve()
+script_path = (root / Path({{ output_path_literal }})).resolve()
+try:
+    script_path.relative_to(root)
+except ValueError as exc:
+    raise ValueError(f"generated script path escapes bundle root: {script_path}") from exc
+
+if not script_path.exists():
+    raise FileNotFoundError(f"generated script does not exist: {script_path}")
+
+runpy.run_path(str(script_path), run_name="__main__")

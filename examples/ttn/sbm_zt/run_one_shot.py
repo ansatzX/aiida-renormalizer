@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
+import os
+
 from aiida import load_profile, orm
 
 from aiida_renormalizer.calcfunction.calcfunction_ttn_sbm_zt import (
     ColeDavidsonSDF_setup,
-    define_hamiltonian_terms,
-    define_basis,
-    build_ttn_model,
-    build_dynamcis_calculation,
     build_bundle_manifest,
+    build_time_evolution_section,
+    build_ttn_model,
 )
 from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
 from aiida_renormalizer.utils import run_process
@@ -19,9 +19,17 @@ from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
 
 load_profile()
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
 CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = True
+REAL_RUN = _env_bool("AIIDA_RENO_SBM_ZT_REAL_RUN", True)
 DEBUG_PROVENANCE = False
 FAIL_FAST = True
 MAX_RETRIES = 0
@@ -52,7 +60,11 @@ UPPER_LIMIT = 30.0
 # CALC: dynamics settings.
 DT = 0.2
 NSTEPS = 200
-METHOD = "TDVP PS one-site"
+METHOD = "tdvp-ps"
+OBSERVATIONS = [
+    {"label": "sigma_z", "symbol": "sigma_z", "dofs": SPIN_DOF, "qn": 0},
+    {"label": "sigma_x", "symbol": "sigma_x", "dofs": SPIN_DOF, "qn": 0},
+]
 
 
 # Workflow wiring below this line.
@@ -68,54 +80,48 @@ def main() -> None:
         n_modes=N_MODES,
     )
 
-    # Build model: merge system, environment, and coupling terms into one Hamiltonian.
+    # Build model locally: make the symbolic Hamiltonian and basis explicit.
     omega_k = env.get_array("omega_k").tolist()
     c_j2 = env.get_array("c_j2").tolist()
 
     hamiltonian_terms_py: list[list[object]] = list(SYSTEM_TERMS)
-    for imode in range(len(omega_k)):
+    for imode, omega in enumerate(omega_k):
         mode_dof = f"{MODE_DOF_PREFIX}{imode}"
         hamiltonian_terms_py.extend(
             [
                 ["p^2", mode_dof, 0.5, 0],
-                ["x^2", mode_dof, 0.5 * omega_k[imode] ** 2, 0],
+                ["x^2", mode_dof, 0.5 * omega**2, 0],
             ]
         )
 
-    for imode in range(len(omega_k)):
+    for imode, coupling in enumerate(c_j2):
         mode_dof = f"{MODE_DOF_PREFIX}{imode}"
         hamiltonian_terms_py.append(
-            ["sigma_z x", [SPIN_DOF, mode_dof], c_j2[imode] ** 0.5, [0, 0]]
+            ["sigma_z x", [SPIN_DOF, mode_dof], coupling**0.5, [0, 0]]
         )
 
     basis_py: list[list[object]] = [["half_spin", SPIN_DOF, SPIN_SIGMAQN]]
-    for imode in range(len(omega_k)):
-        safe_omega = max(float(omega_k[imode]), 1e-12)
+    for imode, omega in enumerate(omega_k):
+        mode_dof = f"{MODE_DOF_PREFIX}{imode}"
+        safe_omega = max(float(omega), 1e-12)
         nbas = int(round(max(16 * float(c_j2[imode]) / safe_omega**3, 4.0)))
-        basis_py.append(["sho", f"{MODE_DOF_PREFIX}{imode}", float(omega_k[imode]), nbas])
-
-    # Normalize user-authored model pieces into plugin datatypes.
-    hamiltonian_terms, hamiltonian_terms_node = run_process(
-        define_hamiltonian_terms,
-        hamiltonian_terms=hamiltonian_terms_py,
-    )
-    basis, basis_node = run_process(
-        define_basis,
-        basis=basis_py,
-    )
+        basis_py.append(["sho", mode_dof, omega, nbas])
 
     model_section, model_section_node = run_process(
         build_ttn_model,
-        hamiltonian_terms=hamiltonian_terms,
-        basis=basis,
+        hamiltonian_terms=hamiltonian_terms_py,
+        basis=basis_py,
         tree_type=TREE_TYPE,
         m_max=M_MAX,
     )
+
+    # Render the concrete time-evolution block; observations stay visible above.
     calculation_section, calculation_section_node = run_process(
-        build_dynamcis_calculation,
+        build_time_evolution_section,
         dt=DT,
         nsteps=NSTEPS,
         method=METHOD,
+        observations=OBSERVATIONS,
     )
 
     # Render the final TTN script and package it into one execution bundle.
@@ -142,15 +148,13 @@ def main() -> None:
     if DEBUG_PROVENANCE:
         for label, node in [
             ("ColeDavidsonSDF_setup", env_node),
-            ("define_hamiltonian_terms", hamiltonian_terms_node),
-            ("define_basis", basis_node),
             ("build_ttn_model", model_section_node),
-            ("build_calculation", calculation_section_node),
+            ("build_time_evolution_section", calculation_section_node),
             ("build_bundle_manifest", bundle_node),
         ]:
             if node is not None:
                 print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote 4 scripts to {out}")
+    print(f"[preview] wrote bundle scripts to {out}")
     print(f"work_dir={WORK_DIR}")
     if not REAL_RUN:
         return
