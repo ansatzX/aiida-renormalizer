@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 
-from aiida import load_profile, orm
+from aiida import load_profile
 
 from aiida_renormalizer.calcfunction.calcfunction_ttn_sbm_zt import (
     ColeDavidsonSDF_setup,
@@ -15,7 +15,6 @@ from aiida_renormalizer.calcfunction.calcfunction_ttn_sbm_zt import (
 )
 from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
 from aiida_renormalizer.utils import run_process
-from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
 
 load_profile()
 
@@ -27,29 +26,25 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
-CODE = "reno-script-clean@localhost"
 WORK_DIR = "generated_scripts"
-REAL_RUN = _env_bool("AIIDA_RENO_SBM_ZT_REAL_RUN", True)
+REAL_RUN = _env_bool("AIIDA_RENO_SBM_ZT_REAL_RUN", False)
 DEBUG_PROVENANCE = False
-FAIL_FAST = True
-MAX_RETRIES = 0
-RESUME_FROM_STAGE = 1
 
 # INPUT: spectral density information and mode count.
 ITA = 1.0
 OMEGA_C = 0.1
 BETA = 0.5
-RAW_DELTA = 1.0
 N_MODES = 1000
 
 # INPUT: system operator definitions.
 EPSILON = 0.0
+DELTA = 1.0
 SPIN_DOF = "spin"
 SPIN_SIGMAQN = [0, 0]
 MODE_DOF_PREFIX = "v_"
 SYSTEM_TERMS = [
     ["sigma_z", SPIN_DOF, EPSILON, 0],
-    ["sigma_x", SPIN_DOF, "delta_eff", 0],
+    ["sigma_x", SPIN_DOF, DELTA, 0],
 ]
 
 # BUILD MODEL: tensor-network construction choices.
@@ -61,9 +56,9 @@ UPPER_LIMIT = 30.0
 DT = 0.2
 NSTEPS = 200
 METHOD = "tdvp-ps"
-OBSERVATIONS = [
-    {"label": "sigma_z", "symbol": "sigma_z", "dofs": SPIN_DOF, "qn": 0},
-    {"label": "sigma_x", "symbol": "sigma_x", "dofs": SPIN_DOF, "qn": 0},
+OBSERVATION_TERMS = [
+    ["sigma_z", SPIN_DOF, 1.0, 0],
+    ["sigma_x", SPIN_DOF, 1.0, 0],
 ]
 
 
@@ -76,15 +71,19 @@ def main() -> None:
         omega_c=OMEGA_C,
         beta=BETA,
         upper_limit=UPPER_LIMIT,
-        raw_delta=RAW_DELTA,
         n_modes=N_MODES,
     )
 
     # Build model locally: make the symbolic Hamiltonian and basis explicit.
     omega_k = env.get_array("omega_k").tolist()
     c_j2 = env.get_array("c_j2").tolist()
+    renormalization_constant = float(env.base.attributes.get("renormalization_constant"))
+    delta_eff = DELTA * renormalization_constant
 
-    hamiltonian_terms_py: list[list[object]] = list(SYSTEM_TERMS)
+    hamiltonian_terms_py: list[list[object]] = [
+        ["sigma_z", SPIN_DOF, EPSILON, 0],
+        ["sigma_x", SPIN_DOF, delta_eff, 0],
+    ]
     for imode, omega in enumerate(omega_k):
         mode_dof = f"{MODE_DOF_PREFIX}{imode}"
         hamiltonian_terms_py.extend(
@@ -107,6 +106,7 @@ def main() -> None:
         nbas = int(round(max(16 * float(c_j2[imode]) / safe_omega**3, 4.0)))
         basis_py.append(["sho", mode_dof, omega, nbas])
 
+    # Record deterministic rendering steps through calcfunctions.
     model_section, model_section_node = run_process(
         build_ttn_model,
         hamiltonian_terms=hamiltonian_terms_py,
@@ -114,17 +114,13 @@ def main() -> None:
         tree_type=TREE_TYPE,
         m_max=M_MAX,
     )
-
-    # Render the concrete time-evolution block; observations stay visible above.
     calculation_section, calculation_section_node = run_process(
         build_time_evolution_section,
         dt=DT,
         nsteps=NSTEPS,
         method=METHOD,
-        observations=OBSERVATIONS,
+        observations=OBSERVATION_TERMS,
     )
-
-    # Render the final TTN script and package it into one execution bundle.
     bundle_outputs, bundle_node = run_process(
         build_bundle_manifest,
         environment=env,
@@ -154,21 +150,10 @@ def main() -> None:
         ]:
             if node is not None:
                 print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote bundle scripts to {out}")
+    print(f"[preview] wrote generated script bundle to {out}")
     print(f"work_dir={WORK_DIR}")
-    if not REAL_RUN:
-        return
-    outputs, node = run_process(
-        BundleRunnerWorkChain,
-        code=orm.load_code(CODE),
-        manifest=manifest,
-        fail_fast=FAIL_FAST,
-        max_retries=MAX_RETRIES,
-        resume_from_stage=RESUME_FROM_STAGE,
-    )
-    if DEBUG_PROVENANCE and node is not None:
-        print(f"[BundleRunnerWorkChain] pk={node.pk}")
-    print(outputs["output_parameters"].get_dict())
+    if REAL_RUN:
+        print("[calcfunction-only] generated script materialized; execute it directly for calculation.")
 
 
 if __name__ == "__main__":
