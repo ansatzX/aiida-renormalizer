@@ -7,11 +7,12 @@ build-backend = "setuptools.build_meta"
 name = "aiida-renormalizer"
 version = "0.1.0"
 description = "AiiDA plugin for the Renormalizer tensor network package"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "aiida-core==2.7.3",
     "renormalizer",
     "numpy<2.0",
+    "scipy",  # CD tail integration in the case library
     "jinja2>=3",  # Required for CalcJob driver template rendering
     "print-tree2",  # Required for TTN functionality
     "tomli>=2,<3",  # TOML parser (consistent dependency across Python versions)
@@ -68,3 +69,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.setuptools.package-data]
+"aiida_renormalizer" = ["templates/*.jinja"]
+"aiida_renormalizer.cases.ttn_sbm_zt" = ["templates/*.jinja"]

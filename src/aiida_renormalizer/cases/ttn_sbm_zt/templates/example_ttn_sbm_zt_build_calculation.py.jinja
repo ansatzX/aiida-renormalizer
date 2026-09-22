@@ -1,0 +1,91 @@
+{{ evolve_validation_source }}
+
+
+DT = {{ dt_literal }}
+NSTEPS = {{ nsteps_literal }}
+OBSERVATION_SPECS = {{ observation_specs_literal }}
+OBSERVE_INITIAL = {{ observe_initial_literal }}
+OBSERVE_EVERY = {{ observe_every_literal }}
+START_TIME = {{ start_time_literal }}
+START_STEP = {{ start_step_literal }}
+
+
+def build_evolve_config():
+    config = EvolveConfig(
+        method=EvolveMethod.{{ evolve_method_name }},
+{% for name, value in evolve_config_kwargs.items() %}        {{ name }}={{ value }},
+{% endfor %}    )
+{% for name, value in evolve_config_attributes.items() %}    config.{{ name }} = {{ value }}
+{% endfor %}    return config
+
+
+def build_observation_operators(basis_tree):
+    return {
+        item["label"]: TTNO(basis_tree, [
+            Op(term["symbol"], term["dofs"], factor=term["factor"], qn=term["qn"])
+            for term in item["terms"]
+        ])
+        for item in OBSERVATION_SPECS
+    }
+
+
+def evolve_segment(
+    state, hamiltonian, *, dt, nsteps, evolve_config, observations,
+    observe_initial, observe_every, start_time=0.0, start_step=0,
+):
+    """Evolve the supplied TTNS and return (final_state, observation_rows).
+
+    This function never rebuilds the model or initializes a state. Always retain
+    its returned state; Reno may return a new TTNS at each step. Use state.copy()
+    explicitly before independent branches or to retain the input's solver config.
+    A nonempty segment applies evolve_config to the supplied state. Operators share state.basis.
+    Observation spacing is local to this segment; clock offsets are explicit.
+    Zero steps optionally measures the supplied state without changing its config.
+    """
+    import math
+    from numbers import Real
+
+    if (
+        isinstance(dt, bool) or not isinstance(dt, Real) or not math.isfinite(dt) or dt <= 0
+        or type(nsteps) is not int or nsteps < 0
+    ):
+        raise ValueError("dt must be finite and positive; nsteps must be non-negative")
+    if (
+        isinstance(start_time, bool) or not isinstance(start_time, Real)
+        or not math.isfinite(start_time) or type(start_step) is not int or start_step < 0
+    ):
+        raise ValueError("start_time must be finite; start_step must be non-negative")
+    if type(observe_every) is not int or observe_every < 1 or type(observe_initial) is not bool:
+        raise ValueError("observe_every must be positive; observe_initial must be a bool")
+    if hamiltonian.basis is not state.basis:
+        raise ValueError("Hamiltonian and state must share the same basis tree")
+    if nsteps:
+        # The same recorded/runtime validator rejects controls that native TTN ignores.
+        snapshot_evolve_config(evolve_config)
+    operators = {}
+    for label, operator in observations.items():
+        if not isinstance(label, str) or not label.strip() or label in {"step", "time"}:
+            raise ValueError(f"invalid or reserved observation label: {label}")
+        if not isinstance(operator, TTNO):
+            operator = TTNO(state.basis, operator)
+        if operator.basis is not state.basis:
+            raise ValueError("observations and state must share the same basis tree")
+        operators[label] = operator
+    rows = []
+
+    def measure(local_step):
+        row = {"step": start_step + local_step, "time": start_time + local_step * dt}
+        for label, operator in operators.items():
+            value = complex(state.expectation(operator))
+            row[label] = value.real if value.imag == 0 else {"real": value.real, "imag": value.imag}
+        rows.append(row)
+
+    if operators and observe_initial:
+        measure(0)
+    if nsteps:
+        state.evolve_config = evolve_config
+    for step in range(1, nsteps + 1):
+        state = state.evolve(hamiltonian, dt)
+        if operators and step % observe_every == 0:
+            measure(step)
+    return state, rows
