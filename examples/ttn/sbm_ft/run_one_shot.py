@@ -1,199 +1,142 @@
 #!/usr/bin/env python
-"""TTN finite-temperature script-generation example."""
+"""Finite-temperature CD spin-boson dynamics through explicit thermofield doubling."""
 
 from __future__ import annotations
 
-import numpy
-from aiida import load_profile, orm
+import os
+from pathlib import Path
 
-from aiida_renormalizer.calcfunction.calcfunction_ttn_sbm_ft import (
-    build_bundle_manifest,
-    build_environment_modes,
-    build_ttn_script,
-    define_basis,
-    define_hamiltonian_terms,
-    extract_spectral_density_parameters,
-    gather_known_parameters,
+import numpy as np
+from aiida import load_profile
+from renormalizer.model import Op
+from renormalizer.model.basis import BasisHalfSpin, BasisSHO
+from renormalizer.tn import BasisTree, TreeNodeBasis
+from renormalizer.utils import CompressCriteria, EvolveConfig, EvolveMethod
+
+from aiida_renormalizer.cases.ttn_sbm_ft import (
+    assemble_script,
+    cd_renormalization_factor,
+    discretize_cole_davidson_spectrum,
+    record_evolution,
+    record_model,
+    write_dry_run,
 )
-from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
 from aiida_renormalizer.utils import run_process
-from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
 
-load_profile()
-
-CODE = "reno-script-clean@localhost"
-WORK_DIR = "generated_scripts"
-REAL_RUN = True
-DEBUG_PROVENANCE = False
-FAIL_FAST = True
-MAX_RETRIES = 0
-RESUME_FROM_STAGE = 1
-
-# INPUT: spectral density information and mode count.
-ITA = 1.0
-OMEGA_C = 1.0
-BETA = 0.25
-TEMPERATURE = 2.0
-RAW_DELTA = 1.0
-N_MODES = 1000
-UPPER_LIMIT = 30.0
-
-# INPUT: system operator definitions.
-EPSILON = 0.0
-SPIN_DOF = "spin"
-SPIN_SIGMAQN = [0, 0]
-MODE_DOF_PREFIX = "v_"
-SYSTEM_TERMS = [
-    ["sigma_z", SPIN_DOF, EPSILON, 0],
-    ["sigma_x", SPIN_DOF, "delta_eff", 0],
-]
-
-# BUILD MODEL: tensor-network construction choices.
-M_MAX = 20
-
-# CALC: dynamics settings.
-DT = 0.1
-NSTEPS = 400
-METHOD = "tdvp_ps"
+SMOKE_TEST = os.getenv("AIIDA_RENO_TTN_SBM_FT_SMOKE", "0") == "1"
+OUTPUT_DIR = Path(__file__).with_name("generated_scripts")
+CD_AMPLITUDE = 1.0
+BATH_FREQUENCY_SCALE = 1.0
+CD_SHAPE_EXPONENT = 0.25  # Spectral shape, not inverse temperature.
+THERMAL_ENERGY = 2.0  # k_B T in the same energy convention as the Hamiltonian.
+N_BATH_MODES = 2 if SMOKE_TEST else 1000  # Before p/q doubling.
+DISCRETIZATION_CUTOFF = 30.0
+SPIN_BIAS = 0.0
+BARE_TUNNELING = 1.0  # Coefficient of sigma_x, with no factor 1/2.
+MAX_BOND_DIMENSION = 4 if SMOKE_TEST else 20
+TIME_STEP = 0.1
+EVOLUTION_STEPS = 1 if SMOKE_TEST else 400
 
 
-# Workflow wiring below this line.
-def main() -> None:
-    input_params = {
-        "ita": ITA,
-        "omega_c": OMEGA_C,
-        "beta": BETA,
-        "temperature": TEMPERATURE,
-    }
-    model_params = {
-        "epsilon": EPSILON,
-        "raw_delta": RAW_DELTA,
-        "n_modes": N_MODES,
-        "m_max": M_MAX,
-        "upper_limit": UPPER_LIMIT,
-    }
-    calc_params = {
-        "workflow_name": "ttn_sbm_ft",
-        "dt": DT,
-        "nsteps": NSTEPS,
-        "method": METHOD,
-    }
-
-    known_parameters, known_node = run_process(
-        gather_known_parameters,
-        input_params=input_params,
-        model_params=model_params,
-        calc_params=calc_params,
-        system_hamiltonian_terms=SYSTEM_TERMS,
+def main(output_dir: str | Path | None = None) -> Path:
+    destination = Path(output_dir) if output_dir is not None else OUTPUT_DIR
+    if destination.exists():
+        raise FileExistsError(f"Choose a fresh output directory: {destination}")
+    if not np.isfinite(THERMAL_ENERGY) or THERMAL_ENERGY <= 0:
+        raise ValueError("THERMAL_ENERGY must be finite and positive")
+    load_profile()
+    bath, _ = run_process(
+        discretize_cole_davidson_spectrum,
+        ita=CD_AMPLITUDE,
+        omega_c=BATH_FREQUENCY_SCALE,
+        beta=CD_SHAPE_EXPONENT,
+        upper_limit=DISCRETIZATION_CUTOFF,
+        n_modes=N_BATH_MODES,
+        method="Wang1",
     )
-    spectral_density_parameters, spectral_node = run_process(
-        extract_spectral_density_parameters,
-        known_parameters=known_parameters,
+    frequencies = bath.get_array("omega_k")
+    coupling_squared = bath.get_array("c_j2")
+    cutoff = float(frequencies[-1])
+    renormalization, _ = run_process(
+        cd_renormalization_factor,
+        bath=bath,
+        lower_cutoff=cutoff,
+        upper_cutoff=1000 * cutoff,
     )
-    renormalized_discretized_modes, renorm_node = run_process(
-        build_environment_modes,
-        known_parameters=known_parameters,
-        spectral_density_parameters=spectral_density_parameters,
-    )
+    effective_tunneling = BARE_TUNNELING * renormalization.value
 
-    mode_data = renormalized_discretized_modes.get_dict()
-    omega_k = numpy.asarray(mode_data["omega_k"], dtype=float)
-    c_j2 = numpy.asarray(mode_data["c_j2"], dtype=float)
-    c = numpy.sqrt(c_j2)
-    theta_array = numpy.arctanh(numpy.exp(-omega_k / TEMPERATURE / 2))
-
-    # Build model: merge system, environment, and coupling terms into one Hamiltonian.
-    hamiltonian_terms_py: list[list[object]] = list(SYSTEM_TERMS)
-    for imode, omega in enumerate(omega_k):
-        hamiltonian_terms_py.extend(
-            [
-                ["p^2", f"{MODE_DOF_PREFIX}{imode}_p", 0.5, 0],
-                ["x^2", f"{MODE_DOF_PREFIX}{imode}_p", 0.5 * float(omega) ** 2, 0],
-                ["p^2", f"{MODE_DOF_PREFIX}{imode}_q", -0.5, 0],
-                ["x^2", f"{MODE_DOF_PREFIX}{imode}_q", -0.5 * float(omega) ** 2, 0],
-                [
-                    "sigma_z x",
-                    [SPIN_DOF, f"{MODE_DOF_PREFIX}{imode}_p"],
-                    float(numpy.cosh(theta_array[imode]) * c[imode]),
-                    [0, 0],
-                ],
-                [
-                    "sigma_z x",
-                    [SPIN_DOF, f"{MODE_DOF_PREFIX}{imode}_q"],
-                    float(numpy.sinh(theta_array[imode]) * c[imode]),
-                    [0, 0],
-                ],
-            ]
+    # Thermal preparation is a Bogoliubov transformation of H, not imaginary-time evolution.
+    # The p oscillator has positive energy, q has negative auxiliary energy.
+    theta = np.arctanh(np.exp(-frequencies / (2 * THERMAL_ENERGY)))
+    hamiltonian = [
+        Op("sigma_z", "spin", factor=SPIN_BIAS, qn=0),
+        Op("sigma_x", "spin", factor=effective_tunneling, qn=0),
+    ]
+    spin_basis = BasisHalfSpin("spin", sigmaqn=[0, 0])
+    bath_basis, contract_labels = [], []
+    initial_state = {"spin": 0}  # +z spin; every doubled oscillator starts in its vacuum.
+    for index, (omega, squared_coupling, angle) in enumerate(
+        zip(frequencies, coupling_squared, theta)
+    ):
+        omega, squared_coupling = float(omega), float(squared_coupling)
+        # Retain the upstream empirical cutoff: cap at 512, round, then double.
+        basis_size = 2 * int(
+            round(min(max(16 * squared_coupling / omega**3 * np.cosh(angle) ** 2, 4), 512))
         )
-
-    basis_py: list[list[object]] = [["half_spin", SPIN_DOF, SPIN_SIGMAQN]]
-    nbas = numpy.maximum(16 * c**2 / omega_k**3 * numpy.cosh(theta_array) ** 2, numpy.ones(len(omega_k)) * 4)
-    nbas = numpy.minimum(nbas, numpy.ones(len(omega_k)) * 512)
-    nbas = numpy.round(nbas).astype(int) * 2
-    for imode, omega in enumerate(omega_k):
-        basis_py.append(["sho", f"{MODE_DOF_PREFIX}{imode}_p", float(omega), int(nbas[imode])])
-        basis_py.append(["sho", f"{MODE_DOF_PREFIX}{imode}_q", float(omega), int(nbas[imode])])
-
-    hamiltonian_terms, hamiltonian_terms_node = run_process(
-        define_hamiltonian_terms,
-        op_spec=hamiltonian_terms_py,
+        for branch, energy_sign, weight in (("p", 1, np.cosh(angle)), ("q", -1, np.sinh(angle))):
+            dof = f"v_{index}_{branch}"
+            bath_basis.append(BasisSHO(dof, omega=omega, nbas=basis_size))
+            contract_labels.append(basis_size > MAX_BOND_DIMENSION)
+            initial_state[dof] = 0
+            hamiltonian.extend(
+                [
+                    Op("p^2", dof, factor=0.5 * energy_sign, qn=0),
+                    Op("x^2", dof, factor=0.5 * energy_sign * omega**2, qn=0),
+                    Op(
+                        "sigma_z x",
+                        ["spin", dof],
+                        factor=float(weight * squared_coupling**0.5),
+                        qn=[0, 0],
+                    ),
+                ]
+            )
+    root = BasisTree.binary_mctdh(
+        bath_basis,
+        contract_primitive=True,
+        contract_label=contract_labels,
+        dummy_label="n",
+    ).root
+    root.add_child(TreeNodeBasis([spin_basis]))
+    model = record_model(
+        hamiltonian=hamiltonian,
+        basis_tree=BasisTree(root),
+        initial_state=initial_state,
+        compression_criteria=CompressCriteria.fixed,
+        max_bond_dimension=MAX_BOND_DIMENSION,
+        expand_bonds=True,
+        expansion_coefficient=1e-10,
     )
-    basis, basis_node = run_process(define_basis, basis_spec=basis_py)
-
-    script_payload, script_node = run_process(
-        build_ttn_script,
-        input_params=input_params,
-        model_params=model_params,
-        calc_params=calc_params,
-        op_spec=hamiltonian_terms,
-        basis_spec=basis,
-        real_run=REAL_RUN,
+    evolution = record_evolution(
+        dt=TIME_STEP,
+        nsteps=EVOLUTION_STEPS,
+        evolve_config=EvolveConfig(EvolveMethod.tdvp_ps),
+        observations={
+            "sigma_z": Op("sigma_z", "spin", qn=0),
+            "sigma_x": Op("sigma_x", "spin", qn=0),
+        },
+        observe_initial=False,
+        observe_every=1,
     )
-
-    script_name = script_payload.get_dict()["script_name"]
-    script_text = script_payload.get_dict()["script_text"]
-    manifest, manifest_node = run_process(
-        build_bundle_manifest,
-        script_name=script_name,
-        script_text=script_text,
-        work_dir=WORK_DIR,
+    script, _ = run_process(
+        assemble_script,
+        environment=bath,
+        renormalization=renormalization,
+        model_section=model,
+        calculation_section=evolution,
+        analysis_section={},
     )
-
-    out = materialize_python_script_bundle_preview(
-        example_file=__file__,
-        work_dir=WORK_DIR,
-        script_name=script_name,
-        script_text=script_text,
-        manifest=manifest,
-    )
-    if DEBUG_PROVENANCE:
-        for label, node in [
-            ("gather_known_parameters", known_node),
-            ("extract_spectral_density_parameters", spectral_node),
-            ("build_environment_modes", renorm_node),
-            ("define_hamiltonian_terms", hamiltonian_terms_node),
-            ("define_basis", basis_node),
-            ("build_ttn_script", script_node),
-            ("build_bundle_manifest", manifest_node),
-        ]:
-            if node is not None:
-                print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote 4 scripts to {out}")
-    print(f"work_dir={WORK_DIR}")
-    if not REAL_RUN:
-        return
-    outputs, node = run_process(
-        BundleRunnerWorkChain,
-        code=orm.load_code(CODE),
-        manifest=manifest,
-        fail_fast=FAIL_FAST,
-        max_retries=MAX_RETRIES,
-        resume_from_stage=RESUME_FROM_STAGE,
-    )
-    if DEBUG_PROVENANCE and node is not None:
-        print(f"[BundleRunnerWorkChain] pk={node.pk}")
-    print(outputs["output_parameters"].get_dict())
+    return write_dry_run(script, destination)
 
 
 if __name__ == "__main__":
-    main()
+    print(main())

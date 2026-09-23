@@ -1,136 +1,128 @@
 #!/usr/bin/env python
-"""MPS Hubbard script-generation example."""
+"""Open Hubbard chain: DMRG followed by imaginary-time refinement.
 
-from __future__ import annotations
+Reno '+' annihilates and '-' creates an electron. Spin orbitals are ordered
+0-up, 0-down, 1-up, 1-down, ...; all energies and times use atomic units.
+Running this launcher records and writes code, without executing the solver.
+"""
 
-from aiida import load_profile, orm
+import os
+from pathlib import Path
 
-from aiida_renormalizer.calcfunction.calcfunction_mps_hubbard import (
-    build_bundle_manifest,
-    build_mps_script,
-    define_basis,
-    define_hamiltonian_terms,
+from aiida import load_profile
+from renormalizer.model import Op
+from renormalizer.model.basis import BasisHalfSpin
+from renormalizer.utils import EvolveConfig, EvolveMethod, OptimizeConfig
+
+from aiida_renormalizer.cases.mps_hubbard import (
+    assemble_script,
+    record_dmrg,
+    record_imaginary_time,
+    record_model,
+    record_observations,
+    record_random_state,
+    write_dry_run,
 )
-from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
-from aiida_renormalizer.utils import run_process
-from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
 
-load_profile()
+# Preserve the existing small-run environment switch; ordinary execution only generates code.
+SMOKE_TEST = os.getenv("AIIDA_RENO_MPS_HUBBARD_SMOKE", "0").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
 
-CODE = "reno-script-clean@localhost"
-WORK_DIR = "generated_scripts"
-REAL_RUN = True
-DEBUG_PROVENANCE = False
-FAIL_FAST = True
-MAX_RETRIES = 0
-RESUME_FROM_STAGE = 1
-
-# INPUT
-NSITES = 10
-T = -1.0
-U = 4.0
-
-# MODEL
-NELEC = [5, 5]
-M_MAX = 100
-
-# CALC
-WORKFLOW_NAME = "hubbard_ground_state"
-METHOD = "2site"
+N_SITES = 3 if SMOKE_TEST else 10  # Number of spatial sites in the open chain.
+HOPPING = -1.0  # Nearest-neighbor hopping coefficient.
+ONSITE_REPULSION = 1.0 if SMOKE_TEST else 4.0  # Energy cost for double occupation.
+N_ELECTRONS = [1, 1] if SMOKE_TEST else [5, 5]  # Conserved [spin-up, spin-down] electron counts.
+MAX_BOND_DIMENSION = 16 if SMOKE_TEST else 100
+MAX_IMAGINARY_STEPS = 2 if SMOKE_TEST else 1000
+ENERGY_CHANGE_ATOL = 1e-5  # Stop refinement when consecutive energies agree.
 
 
-def main() -> None:
-    input_params = {"nsites": NSITES, "t": T, "U": U}
-    model_params = {"nelec": NELEC, "m_max": M_MAX}
-    calc_params = {"workflow_name": WORKFLOW_NAME, "method": METHOD}
-
-    qn_up = {"+": [-1, 0], "-": [1, 0], "Z": [0, 0]}
-    qn_do = {"+": [0, -1], "-": [0, 1], "Z": [0, 0]}
-
-    hamiltonian_terms_py: list[list[object]] = []
-    for i in range(2 * (NSITES - 1)):
-        if i % 2 == 0:
-            qn1 = [qn_up["Z"], qn_up["+"], qn_do["Z"], qn_up["-"]]
-            qn2 = [qn_up["Z"], qn_up["-"], qn_do["Z"], qn_up["+"]]
-        else:
-            qn1 = [qn_do["Z"], qn_do["+"], qn_up["Z"], qn_do["-"]]
-            qn2 = [qn_do["Z"], qn_do["-"], qn_up["Z"], qn_do["+"]]
-        hamiltonian_terms_py.extend(
+def main(output_dir=None):
+    load_profile()
+    up = {"+": [-1, 0], "-": [1, 0], "Z": [0, 0]}
+    down = {"+": [0, -1], "-": [0, 1], "Z": [0, 0]}
+    hamiltonian = []
+    for orbital in range(2 * (N_SITES - 1)):
+        spin, opposite = (up, down) if orbital % 2 == 0 else (down, up)
+        # Explicit Jordan-Wigner strings fix the fermionic sign convention.
+        dofs = [orbital, orbital, orbital + 1, orbital + 2]
+        hamiltonian.extend(
             [
-                ["Z + Z -", [i, i, i + 1, i + 2], T, qn1],
-                ["Z - Z +", [i, i, i + 1, i + 2], -T, qn2],
+                Op(
+                    "Z + Z -",
+                    dofs,
+                    factor=HOPPING,
+                    qn=[spin["Z"], spin["+"], opposite["Z"], spin["-"]],
+                ),
+                Op(
+                    "Z - Z +",
+                    dofs,
+                    factor=-HOPPING,
+                    qn=[spin["Z"], spin["-"], opposite["Z"], spin["+"]],
+                ),
             ]
         )
-
-    for i in range(0, 2 * NSITES, 2):
-        qn = [qn_up["-"], qn_up["+"], qn_do["-"], qn_do["+"]]
-        hamiltonian_terms_py.append(["- + - +", [i, i, i + 1, i + 1], U, qn])
-
-    basis_py: list[list[object]] = []
-    for i in range(2 * NSITES):
-        if i % 2 == 0:
-            sigmaqn = [[0, 0], [1, 0]]
-        else:
-            sigmaqn = [[0, 0], [0, 1]]
-        basis_py.append(["half_spin", i, sigmaqn])
-
-    hamiltonian_terms, hamiltonian_terms_node = run_process(
-        define_hamiltonian_terms,
-        op_spec=hamiltonian_terms_py,
-    )
-    basis, basis_node = run_process(define_basis, basis_spec=basis_py)
-
-    script_payload, script_node = run_process(
-        build_mps_script,
-        input_params=input_params,
-        model_params=model_params,
-        calc_params=calc_params,
-        op_spec=hamiltonian_terms,
-        basis_spec=basis,
-        real_run=REAL_RUN,
+    for orbital in range(0, 2 * N_SITES, 2):
+        hamiltonian.append(
+            Op(
+                "- + - +",
+                [orbital, orbital, orbital + 1, orbital + 1],
+                factor=ONSITE_REPULSION,
+                qn=[up["-"], up["+"], down["-"], down["+"]],
+            )
+        )
+    basis = [
+        BasisHalfSpin(orbital, sigmaqn=[[0, 0], [1, 0] if orbital % 2 == 0 else [0, 1]])
+        for orbital in range(2 * N_SITES)
+    ]
+    model = record_model(hamiltonian=hamiltonian, basis=basis)
+    initial_state = record_random_state(
+        quantum_number=N_ELECTRONS, bond_dimension=MAX_BOND_DIMENSION, percent=1.0
     )
 
-    script_name = script_payload.get_dict()["script_name"]
-    script_text = script_payload.get_dict()["script_text"]
-    manifest, manifest_node = run_process(
-        build_bundle_manifest,
-        script_name=script_name,
-        script_text=script_text,
-        work_dir=WORK_DIR,
+    # Reno's native sweep rows are [bond dimension, sector exploration fraction].
+    optimizer = OptimizeConfig(
+        procedure=[
+            [MAX_BOND_DIMENSION // 4 if SMOKE_TEST else MAX_BOND_DIMENSION, 0.4],
+            [MAX_BOND_DIMENSION // 2 if SMOKE_TEST else MAX_BOND_DIMENSION, 0.2],
+            [3 * MAX_BOND_DIMENSION // 4 if SMOKE_TEST else MAX_BOND_DIMENSION, 0.1],
+            *[[MAX_BOND_DIMENSION, 0.0] for _ in range(4)],
+        ]
     )
-
-    out = materialize_python_script_bundle_preview(
-        example_file=__file__,
-        work_dir=WORK_DIR,
-        script_name=script_name,
-        script_text=script_text,
-        manifest=manifest,
+    optimizer.method = "2site"
+    dmrg = record_dmrg(optimize_config=optimizer, copy_initial_state=True)
+    refinement = record_imaginary_time(
+        evolve_config=EvolveConfig(
+            EvolveMethod.tdvp_ps,
+            adaptive=True,
+            guess_dt=-0.001j,
+            adaptive_rtol=5e-4,
+            ivp_solver="RK45",
+        ),
+        dt=-0.5j,
+        max_steps=MAX_IMAGINARY_STEPS,
+        energy_change_atol=ENERGY_CHANGE_ATOL,
+        normalize=True,
     )
-    if DEBUG_PROVENANCE:
-        for label, node in [
-            ("define_hamiltonian_terms", hamiltonian_terms_node),
-            ("define_basis", basis_node),
-            ("build_mps_script", script_node),
-            ("build_bundle_manifest", manifest_node),
-        ]:
-            if node is not None:
-                print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote 4 scripts to {out}")
-    print(f"work_dir={WORK_DIR}")
-    if not REAL_RUN:
-        return
-    outputs, node = run_process(
-        BundleRunnerWorkChain,
-        code=orm.load_code(CODE),
-        manifest=manifest,
-        fail_fast=FAIL_FAST,
-        max_retries=MAX_RETRIES,
-        resume_from_stage=RESUME_FROM_STAGE,
+    observations = record_observations(
+        operators={
+            "n_up_0": Op("- +", 0, qn=[up["-"], up["+"]]),
+            "n_down_0": Op("- +", 1, qn=[down["-"], down["+"]]),
+        }
     )
-    if DEBUG_PROVENANCE and node is not None:
-        print(f"[BundleRunnerWorkChain] pk={node.pk}")
-    print(outputs["output_parameters"].get_dict())
+    # Refinement receives the DMRG result; the final native MPS is returned at runtime.
+    script = assemble_script(model, initial_state, dmrg, refinement, observations)
+    output_dir = (
+        Path(output_dir)
+        if output_dir is not None
+        else Path(__file__).with_name("generated_scripts")
+    )
+    return write_dry_run(script, output_dir)
 
 
 if __name__ == "__main__":
-    main()
+    print(main())

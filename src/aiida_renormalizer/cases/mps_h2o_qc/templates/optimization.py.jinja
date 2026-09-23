@@ -1,0 +1,68 @@
+{{ validation_source }}
+
+OPTIMIZE_SETTINGS = {{ settings }}
+PRESERVE_INITIAL_STATE = {{ preserve_initial_state }}
+NUCLEAR_REPULSION = {{ nuclear_repulsion }}
+REFERENCE_ENERGY = {{ reference_energy }}
+CHECK_REFERENCE = {{ check_reference }}
+REFERENCE_RTOL = {{ reference_rtol }}
+REFERENCE_ATOL = {{ reference_atol }}
+
+
+def optimize_state(state, hamiltonian, *, optimize_config):
+    """Native DMRG mutates its input; copy at the call site to retain an initial state.
+
+    Return the actual optimized MPS for further sweeps or evolution in this process.
+    The recorded lowest sweep energy and the returned state's expectation may differ.
+    """
+    snapshot_optimization(optimize_config)
+    # Native Mps.copy() copies the Model wrapper, preserving its ordered basis objects.
+    if (len(state.model.basis) != len(hamiltonian.model.basis)
+            or any(left is not right for left, right in
+                   zip(state.model.basis, hamiltonian.model.basis))):
+        raise ValueError("state and MPO must use the same ordered local bases")
+    state.optimize_config = optimize_config
+    energies, final_state = optimize_mps(state, hamiltonian)
+    return final_state, [float(energy) for energy in energies]
+
+
+def summarize_optimization(state, hamiltonian, energies, *, nuclear_repulsion,
+                           reference_energy, check_reference, reference_rtol, reference_atol,
+                           optimize_config):
+    lowest = min(energies)
+    final_energy = float(state.expectation(hamiltonian))
+    total = lowest + nuclear_repulsion
+    # Match NumPy allclose's asymmetric reference tolerance without a runtime NumPy import.
+    matches = abs(total - reference_energy) <= reference_atol + reference_rtol * abs(reference_energy)
+    if check_reference and not matches:
+        raise AssertionError(f"H2O lowest-sweep reference mismatch: {total} != {reference_energy}")
+    planned = len(optimize_config.procedure)
+    return {
+        "electronic_energy": lowest,
+        "lowest_electronic_energy": lowest,
+        "final_state_electronic_energy": final_energy,
+        "nuclear_repulsion": nuclear_repulsion,
+        "lowest_sweep_total_energy": total,
+        "final_state_total_energy": final_energy + nuclear_repulsion,
+        "ground_state_energy": total,
+        "energies": energies,
+        "basis_count": len(state.model.basis),
+        "hamiltonian_term_count": len(state.model.ham_terms),
+        "mpo_bond_dims": list(hamiltonian.bond_dims),
+        "final_bond_dims": list(state.bond_dims),
+        "final_quantum_number": state.qntot.tolist(),
+        "reference_ground_state_energy": reference_energy,
+        "reference_error": total - reference_energy,
+        "reference_matches": matches,
+        "input": INPUT_METADATA,
+        "restart_contract": {"mode": "replay-only", "checkpoint_restart": False},
+        "execution_runtime": {
+            "planned_sweeps": planned,
+            "completed_sweeps": len(energies),
+            "termination_reason": ("converged_before_procedure_end" if len(energies) < planned
+                                   else "procedure_exhausted_or_converged_on_final_sweep"),
+            "optimize_method": optimize_config.method,
+            "energy_rtol": optimize_config.e_rtol,
+            "energy_atol": optimize_config.e_atol,
+        },
+    }

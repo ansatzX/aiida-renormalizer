@@ -1,0 +1,11 @@
+INPUT_METADATA = {{ input_metadata }}
+
+
+def build_model():
+    basis = [
+{% for call in basis_calls %}        {{ call }},
+{% endfor %}    ]
+    hamiltonian = [
+{% for call in terms %}        {{ call }},
+{% endfor %}    ]
+    return Model(basis, hamiltonian)

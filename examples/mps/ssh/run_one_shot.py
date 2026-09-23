@@ -1,146 +1,116 @@
 #!/usr/bin/env python
-"""MPS SSH script-generation example."""
+"""Single-polaron optical SSH chain with interleaved electron/phonon MPS sites.
 
-from __future__ import annotations
+The one-electron sector is intentional: this example does not supply the
+Jordan-Wigner strings needed for a general many-fermion problem. Atomic units.
+The launcher records a standalone DMRG calculation without running it.
+"""
 
-from aiida import load_profile, orm
-from renormalizer.model.model import construct_j_matrix
-from renormalizer.model.op import Op
-from renormalizer.utils import Quantity
+import os
+from pathlib import Path
 
-from aiida_renormalizer.calcfunction.calcfunction_mps_ssh import (
-    build_bundle_manifest,
-    build_mps_script,
-    define_basis,
-    define_hamiltonian_terms,
+from aiida import load_profile
+from renormalizer.model import Op
+from renormalizer.model.basis import BasisSHO, BasisSimpleElectron
+from renormalizer.utils import OptimizeConfig
+
+from aiida_renormalizer.cases.mps_ssh import (
+    assemble_script,
+    record_dmrg,
+    record_model,
+    record_observations,
+    record_random_state,
+    write_dry_run,
 )
-from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
-from aiida_renormalizer.utils import run_process
-from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
 
-load_profile()
+# Preserve the existing small-run environment switch; ordinary execution only generates code.
+SMOKE_TEST = os.getenv("AIIDA_RENO_MPS_SSH_SMOKE", "0").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
 
-CODE = "reno-script-clean@localhost"
-WORK_DIR = "generated_scripts"
-REAL_RUN = True
-DEBUG_PROVENANCE = False
-FAIL_FAST = True
-MAX_RETRIES = 0
-RESUME_FROM_STAGE = 1
-
-# INPUT
-NSITES = 2
-G = 0.7
-W0 = 0.5
-T = -1.0
-
-# MODEL
-NBOSON_MAX = 4
-BOND_DIM = 16
-NSWEEPS = 10
-PERIODIC = True
-
-# CALC
-WORKFLOW_NAME = "ssh_ground_state"
-METHOD = "2site"
+N_SITES = 2 if SMOKE_TEST else 4
+HOPPING = -1.0
+# Hopping modulation per dimensionless phonon displacement.
+SSH_COUPLING = 0.1 if SMOKE_TEST else 0.7
+PHONON_FREQUENCY = 0.5
+N_PHONON_LEVELS = 2 if SMOKE_TEST else 4  # SHO basis size, including the vacuum.
+MAX_BOND_DIMENSION = 4 if SMOKE_TEST else 16
+N_SWEEPS = 2 if SMOKE_TEST else 10
+PERIODIC = not SMOKE_TEST  # A two-site periodic chain would cancel the SSH coupling.
 
 
-def main() -> None:
-    input_params = {"nsites": NSITES, "g": G, "w0": W0, "t": T}
-    model_params = {
-        "nboson_max": NBOSON_MAX,
-        "bond_dim": BOND_DIM,
-        "nsweeps": NSWEEPS,
-        "periodic": PERIODIC,
-    }
-    calc_params = {"workflow_name": WORKFLOW_NAME, "method": METHOD}
+# Native Reno sweep rows: [bond dimension, sector exploration fraction].
+SWEEP_PROCEDURE = (
+    [[MAX_BOND_DIMENSION, 0.2]] + [[MAX_BOND_DIMENSION, 0.0] for _ in range(N_SWEEPS - 1)]
+    if SMOKE_TEST
+    else [
+        [max(1, MAX_BOND_DIMENSION // 4), 0.4],
+        [max(1, MAX_BOND_DIMENSION // 2), 0.2],
+        [max(1, 3 * MAX_BOND_DIMENSION // 4), 0.1],
+        *[[MAX_BOND_DIMENSION, 0.0] for _ in range(N_SWEEPS - 3)],
+    ]
+)
 
-    j_matrix = construct_j_matrix(NSITES, Quantity(T), PERIODIC)
-    ops = []
 
-    for imol in range(NSITES):
-        for jmol in range(NSITES):
-            if j_matrix[imol, jmol] != 0:
-                ops.append(Op(r"a^\dagger a", [imol, jmol], j_matrix[imol, jmol]))
-        ops.append(Op(r"b^\dagger b", (imol, 0), W0))
-
-    for imol in range(NSITES - 1):
-        ops.append(Op(r"a^\dagger a", [imol, imol + 1], G) * Op(r"b^\dagger+b", (imol + 1, 0)))
-        ops.append(Op(r"a^\dagger a", [imol, imol + 1], -G) * Op(r"b^\dagger+b", (imol, 0)))
-        ops.append(Op(r"a^\dagger a", [imol + 1, imol], G) * Op(r"b^\dagger+b", (imol + 1, 0)))
-        ops.append(Op(r"a^\dagger a", [imol + 1, imol], -G) * Op(r"b^\dagger+b", (imol, 0)))
-
+def main(output_dir=None):
+    load_profile()
+    if PERIODIC and N_SITES < 3:
+        raise ValueError("periodic SSH requires at least three sites")
+    bonds = [(site, site + 1) for site in range(N_SITES - 1)]
     if PERIODIC:
-        last = NSITES - 1
-        ops.append(Op(r"a^\dagger a", [last, 0], G) * Op(r"b^\dagger+b", (0, 0)))
-        ops.append(Op(r"a^\dagger a", [last, 0], -G) * Op(r"b^\dagger+b", (last, 0)))
-        ops.append(Op(r"a^\dagger a", [0, last], G) * Op(r"b^\dagger+b", (0, 0)))
-        ops.append(Op(r"a^\dagger a", [0, last], -G) * Op(r"b^\dagger+b", (last, 0)))
-
-    serialized_opsum = [list(op.to_tuple()) for op in ops]
-
-    basis_py: list[list[object]] = []
-    for imol in range(NSITES):
-        basis_py.append(["simple_electron", imol])
-        basis_py.append(["sho", (imol, 0), W0, NBOSON_MAX])
-
-    hamiltonian_terms, hamiltonian_terms_node = run_process(
-        define_hamiltonian_terms,
-        serialized_opsum=serialized_opsum,
+        bonds.append((N_SITES - 1, 0))
+    hamiltonian = [
+        Op(r"b^\dagger b", (site, 0), factor=PHONON_FREQUENCY) for site in range(N_SITES)
+    ]
+    for left, right in bonds:
+        for source, target in ((left, right), (right, left)):
+            hopping = Op(r"a^\dagger a", [source, target])
+            hamiltonian.extend(
+                [
+                    HOPPING * hopping,
+                    SSH_COUPLING * hopping * Op(r"b^\dagger+b", (right, 0)),
+                    -SSH_COUPLING * hopping * Op(r"b^\dagger+b", (left, 0)),
+                ]
+            )
+    basis = []
+    for site in range(N_SITES):
+        basis.extend(
+            [
+                BasisSimpleElectron(site),
+                BasisSHO((site, 0), omega=PHONON_FREQUENCY, nbas=N_PHONON_LEVELS),
+            ]
+        )
+    model = record_model(hamiltonian=hamiltonian, basis=basis)
+    initial_state = record_random_state(
+        quantum_number=1, bond_dimension=MAX_BOND_DIMENSION, percent=1.0
     )
-    basis, basis_node = run_process(define_basis, basis_spec=basis_py)
+    optimizer = OptimizeConfig(procedure=SWEEP_PROCEDURE)
+    optimizer.method = "2site"
+    dmrg = record_dmrg(optimize_config=optimizer, copy_initial_state=True)
 
-    script_payload, script_node = run_process(
-        build_mps_script,
-        input_params=input_params,
-        model_params=model_params,
-        calc_params=calc_params,
-        op_data=hamiltonian_terms,
-        basis_spec=basis,
-        real_run=REAL_RUN,
+    operators = {}
+    for site in range(N_SITES):
+        operators[f"phonon_occupation_{site}"] = Op(r"b^\dagger b", (site, 0))
+        operators[f"phonon_displacement_{site}"] = Op(r"b^\dagger+b", (site, 0))
+    for left in range(N_SITES):
+        number_left = Op(r"a^\dagger a", [left, left])
+        for right in range(N_SITES):
+            # n_i^2 = n_i for a single electronic orbital.
+            operators[f"n_{left}_n_{right}"] = (
+                number_left if left == right else number_left * Op(r"a^\dagger a", [right, right])
+            )
+    observations = record_observations(operators=operators, electronic_rdm=True)
+    script = assemble_script(model, initial_state, dmrg, observations)
+    output_dir = (
+        Path(output_dir)
+        if output_dir is not None
+        else Path(__file__).with_name("generated_scripts")
     )
-
-    script_name = script_payload.get_dict()["script_name"]
-    script_text = script_payload.get_dict()["script_text"]
-    manifest, manifest_node = run_process(
-        build_bundle_manifest,
-        script_name=script_name,
-        script_text=script_text,
-        work_dir=WORK_DIR,
-    )
-
-    out = materialize_python_script_bundle_preview(
-        example_file=__file__,
-        work_dir=WORK_DIR,
-        script_name=script_name,
-        script_text=script_text,
-        manifest=manifest,
-    )
-    if DEBUG_PROVENANCE:
-        for label, node in [
-            ("define_hamiltonian_terms", hamiltonian_terms_node),
-            ("define_basis", basis_node),
-            ("build_mps_script", script_node),
-            ("build_bundle_manifest", manifest_node),
-        ]:
-            if node is not None:
-                print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote 4 scripts to {out}")
-    print(f"work_dir={WORK_DIR}")
-    if not REAL_RUN:
-        return
-    outputs, node = run_process(
-        BundleRunnerWorkChain,
-        code=orm.load_code(CODE),
-        manifest=manifest,
-        fail_fast=FAIL_FAST,
-        max_retries=MAX_RETRIES,
-        resume_from_stage=RESUME_FROM_STAGE,
-    )
-    if DEBUG_PROVENANCE and node is not None:
-        print(f"[BundleRunnerWorkChain] pk={node.pk}")
-    print(outputs["output_parameters"].get_dict())
+    return write_dry_run(script, output_dir)
 
 
 if __name__ == "__main__":
-    main()
+    print(main())

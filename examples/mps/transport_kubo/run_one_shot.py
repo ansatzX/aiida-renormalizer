@@ -1,95 +1,156 @@
 #!/usr/bin/env python
-"""MPS transport Kubo script-generation example."""
+"""Dry-run native MPS transport_kubo example; scientific choices remain here."""
 
 from __future__ import annotations
 
+import math
+import os
+from pathlib import Path
+
+import yaml
 from aiida import load_profile, orm
+from renormalizer.model import Model, Op, Phonon
+from renormalizer.model.basis import BasisSHO, BasisSimpleElectron
+from renormalizer.utils import CompressConfig, EvolveConfig, Quantity
+from renormalizer.utils.configs import CompressCriteria, EvolveMethod
 
-from aiida_renormalizer.calcfunction.calcfunction_mps_transport_kubo import (
-    build_bundle_manifest,
-    build_mps_script,
+from aiida_renormalizer.cases.mps_transport_kubo.api import (
+    assemble_script,
+    record_evolution,
+    record_initial_state,
+    record_model,
 )
-from aiida_renormalizer.example_support import materialize_python_script_bundle_preview
-from aiida_renormalizer.utils import run_process
-from aiida_renormalizer.workchains.bundle_runner import BundleRunnerWorkChain
+from aiida_renormalizer.cases.mps_transport_kubo.artifacts import write_dry_run
 
-load_profile()
-
-CODE = "reno-script-clean@localhost"
-WORK_DIR = "generated_scripts"
-REAL_RUN = True
-DEBUG_PROVENANCE = False
-FAIL_FAST = True
-MAX_RETRIES = 0
-RESUME_FROM_STAGE = 1
-
-# INPUT
-PARAM_FILE = "std.yaml"
-
-# MODEL
-MODEL_FAMILY = "holstein_like_from_yaml"
-TEMPERATURE_PORT = "yaml.temperature"
-
-# CALC
-WORKFLOW_NAME = "transport_kubo"
-EVOLVE_METHOD = "tdvp_ps"
+SMOKE_TEST = os.getenv("AIIDA_RENO_MPS_TRANSPORT_KUBO_SMOKE", "0").lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
 
 
-def main() -> None:
-    input_params = {"param_file": PARAM_FILE}
-    model_params = {
-        "model_family": MODEL_FAMILY,
-        "temperature_port": TEMPERATURE_PORT,
-    }
-    calc_params = {
-        "workflow_name": WORKFLOW_NAME,
-        "evolve_method": EVOLVE_METHOD,
-    }
+# std.yaml remains the authoritative physical input; frozen source needs no sidecar.
+PARAM_FILE = Path(__file__).with_name("std.yaml")
 
-    script_payload, script_node = run_process(
-        build_mps_script,
-        input_params=input_params,
-        model_params=model_params,
-        calc_params=calc_params,
-        real_run=REAL_RUN,
+
+def main(output_dir=None):
+    load_profile()
+    parameter_file = orm.SinglefileData(file=str(PARAM_FILE))
+    parameters = yaml.safe_load(parameter_file.get_content())
+    molecule_count = int(parameters["mol num"])
+    transfer_integral = Quantity(*parameters["j constant"])
+    temperature = Quantity(*parameters["temperature"])
+    phonon_modes = [
+        (Quantity(*omega), Quantity(*displacement))
+        for omega, displacement in parameters["ph modes"]
+    ]
+    dt = float(parameters["evolve dt"])
+    nsteps = parameters.get("evolve nsteps")
+    evolve_time = parameters.get("evolve time")
+    if dt <= 0 or not math.isfinite(dt):
+        raise ValueError("evolve dt must be finite and positive")
+    if nsteps is None:
+        if evolve_time is None or not math.isfinite(evolve_time) or evolve_time < 0:
+            raise ValueError("evolve time must be finite and nonnegative")
+        nsteps = round(evolve_time / dt)
+        if not math.isclose(nsteps * dt, evolve_time, rel_tol=1e-12, abs_tol=1e-12):
+            raise ValueError("Kubo evolve time must be an integer multiple of evolve dt")
+    elif evolve_time is not None and not math.isclose(nsteps * dt, evolve_time):
+        raise ValueError("evolve nsteps and evolve time disagree")
+    if SMOKE_TEST:
+        molecule_count, temperature, dt, nsteps = 2, Quantity(100000, "K"), 0.1, 1
+    evolve_config = EvolveConfig(
+        method=EvolveMethod.prop_and_compress, adaptive=True, guess_dt=0.1 if SMOKE_TEST else 2.0
     )
-    script_dict = script_payload.get_dict()
-    manifest, manifest_node = run_process(
-        build_bundle_manifest,
-        script_name=script_dict["script_name"],
-        script_text=script_dict["script_text"],
-        work_dir=WORK_DIR,
+    imaginary_config = EvolveConfig(
+        method=EvolveMethod.prop_and_compress, adaptive=True, guess_dt=temperature.to_beta() / 1000j
     )
-
-    out = materialize_python_script_bundle_preview(
-        example_file=__file__,
-        work_dir=WORK_DIR,
-        script_name=script_dict["script_name"],
-        script_text=script_dict["script_text"],
-        manifest=manifest,
+    compress_config = CompressConfig(
+        criteria=CompressCriteria.threshold, threshold=1e-2 if SMOKE_TEST else 1e-4
     )
-    if DEBUG_PROVENANCE:
-        for label, node in [
-            ("build_mps_script", script_node),
-            ("build_bundle_manifest", manifest_node),
-        ]:
-            if node is not None:
-                print(f"[{label}] pk={node.pk}")
-    print(f"[preview] wrote 4 scripts to {out}")
-    print(f"work_dir={WORK_DIR}")
-    if not REAL_RUN:
-        return
-    outputs, node = run_process(
-        BundleRunnerWorkChain,
-        code=orm.load_code(CODE),
-        manifest=manifest,
-        fail_fast=FAIL_FAST,
-        max_retries=MAX_RETRIES,
-        resume_from_stage=RESUME_FROM_STAGE,
+    if isinstance(nsteps, bool) or not isinstance(nsteps, int) or nsteps < 0:
+        raise ValueError("evolve nsteps must be a nonnegative integer")
+    if molecule_count < 2:
+        raise ValueError("this transport chain requires at least two molecules")
+    phonons = [
+        Phonon.simplest_phonon(
+            omega=omega, displacement=displacement, temperature=temperature, lam=False, max_pdim=128
+        )
+        for omega, displacement in phonon_modes
+    ]
+    basis, hamiltonian, current = [], [], []
+    distances = [[i - j for j in range(molecule_count)] for i in range(molecule_count)]
+    distances[0][-1], distances[-1][0] = 1, -1
+    for site in range(molecule_count):
+        basis.append(BasisSimpleElectron(dof=site))
+        reorganization = sum(0.5 * ph.omega[0] ** 2 * ph.dis[1] ** 2 for ph in phonons)
+        hamiltonian.append(Op(symbol=r"a^\dagger a", dof=site, factor=reorganization))
+        for mode, phonon in enumerate(phonons):
+            dof, omega, displacement = (site, mode), phonon.omega[0], phonon.dis[1]
+            basis.append(BasisSHO(dof=dof, omega=omega, nbas=phonon.n_phys_dim))
+            hamiltonian += [
+                Op(symbol="p^2", dof=dof, factor=0.5),
+                Op(symbol="x^2", dof=dof, factor=0.5 * omega**2),
+                Op(symbol=r"a^\dagger a", dof=site)
+                * Op(symbol="x", dof=dof, factor=-(omega**2) * displacement),
+            ]
+        if site + 1 < molecule_count:
+            for origin, destination in [(site, site + 1), (site + 1, site)]:
+                hopping = Op(
+                    symbol=r"a^\dagger a",
+                    dof=[origin, destination],
+                    factor=transfer_integral.as_au(),
+                )
+                hamiltonian.append(hopping)
+                # Omit -i here; the runtime restores its squared minus sign in J(t)J(0).
+                current.append(hopping * distances[origin][destination])
+    model = Model(basis=basis, ham_terms=hamiltonian)
+    model_section = record_model(model, source_file=parameter_file)
+    initial = record_initial_state(
+        temperature=temperature,
+        thermal_steps=1,
+        thermal_sector="one_electron",
+        imaginary_config=imaginary_config,
+        evolve_config=evolve_config,
+        compress_config=compress_config,
+        current_terms=[current],
+        subtract_initial_energy=True,
     )
-    if DEBUG_PROVENANCE and node is not None:
-        print(f"[BundleRunnerWorkChain] pk={node.pk}")
-    print(outputs["output_parameters"].get_dict())
+    evolution = record_evolution(
+        evolve_config=evolve_config,
+        compress_config=compress_config,
+        temperature=temperature,
+        dt=dt,
+        nsteps=nsteps,
+        observe_initial=True,
+        correlation_prefactor=-1.0,  # The explicit real current generator omits -i.
+        stop_at_tail=True,
+        tail_window=10,
+        tail_relative_tolerance=1e-5,
+        smoke=SMOKE_TEST,
+    )
+    script = assemble_script(
+        model=model_section,
+        initial_state=initial,
+        evolution=evolution,
+        run_metadata=orm.Dict(
+            dict={
+                "case": "mps_transport_kubo",
+                "smoke": SMOKE_TEST,
+                "temperature_K": temperature.as_au() / Quantity(1.0, "K").as_au(),
+                "current": "real generator omitting -i",
+                "distance": "chain index with signed boundary entries",
+                "restart": "replay-only",
+            }
+        ),
+    )
+    output_dir = (
+        Path(output_dir) if output_dir is not None else Path(__file__).parent / "generated_scripts"
+    )
+    path = write_dry_run(script, output_dir)
+    print(f"Standalone Reno script: {path}")
+    return path
 
 
 if __name__ == "__main__":

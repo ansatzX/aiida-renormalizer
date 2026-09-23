@@ -1,0 +1,53 @@
+{
+  "workflow_name": "transport_kubo",
+  "model": {
+    "basis_count": 4,
+    "hamiltonian_term_count": 10,
+    "mol_num": 2,
+    "h_mpo_bond_dims": [
+      1,
+      4,
+      4,
+      3,
+      1
+    ],
+    "j_oper_bond_dims": [
+      1,
+      2,
+      2,
+      1,
+      1
+    ],
+    "has_peierls_current_operator": false,
+    "distance_matrix": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        -1.0,
+        0.0
+      ]
+    ]
+  },
+  "time_series": [
+    0.0,
+    0.1
+  ],
+  "auto_corr": [
+    {
+      "real": 0.0009000000000000002,
+      "imag": -0.0
+    },
+    {
+      "real": 0.000899961739160202,
+      "imag": -8.509460488246742e-07
+    }
+  ],
+  "auto_corr_decomposition": [],
+  "mobility": {
+    "au": 0.00028419148141476395,
+    "cm2_per_vs": 1.2090591661546004e-05,
+    "integration": "numpy.trapz"
+  }
+}

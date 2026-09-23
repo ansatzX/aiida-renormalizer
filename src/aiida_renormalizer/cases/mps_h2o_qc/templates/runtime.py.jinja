@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+"""Standalone H2O DMRG runtime. Importing only defines phases; main executes them."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from renormalizer import Model, Mpo, Mps, optimize_mps
+from renormalizer.model import Op
+from renormalizer.model.basis import BasisHalfSpin
+
+{{ model }}
+{{ state }}
+{{ optimization }}
+
+
+def main():
+    model = build_model()
+    hamiltonian = Mpo(model)
+    initial_state = create_initial_state(model)
+    state = initial_state.copy() if PRESERVE_INITIAL_STATE else initial_state
+    config = restore_optimization(OPTIMIZE_SETTINGS)
+    final_state, energies = optimize_state(state, hamiltonian, optimize_config=config)
+    result = summarize_optimization(
+        final_state, hamiltonian, energies, nuclear_repulsion=NUCLEAR_REPULSION,
+        reference_energy=REFERENCE_ENERGY, check_reference=CHECK_REFERENCE,
+        reference_rtol=REFERENCE_RTOL, reference_atol=REFERENCE_ATOL, optimize_config=config,
+    )
+    Path(__file__).with_name("h2o_qc_result.json").write_text(json.dumps(result, indent=2))
+    return final_state, result
+
+
+if __name__ == "__main__":
+    main()

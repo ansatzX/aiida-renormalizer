@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+"""Standalone ttn_sbm_ft computation; Python + Renormalizer, no external input sidecars.
+
+Thermal preparation, when present, is encoded in the explicitly doubled
+Hamiltonian. Runtime TTNS objects are local and reusable, with replay-only restart.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from renormalizer.model import Op
+from renormalizer.model import basis as ba
+from renormalizer.mps.mps import expand_bond_dimension_general
+from renormalizer.tn import BasisTree, TTNO, TTNS, TreeNodeBasis
+from renormalizer.utils import CompressConfig, CompressCriteria, EvolveConfig, EvolveMethod
+
+ENVIRONMENT = {{ environment_literal }}
+RESTART_PLAN = {"mode": "replay-only", "checkpoint_restart": False}
+
+{{ model_section }}
+
+{{ calculation_section }}
+
+{{ analysis_source }}
+
+
+def main():
+    state, hamiltonian, tree = build_network_operators_and_state()
+    state, rows = evolve_segment(
+        state, hamiltonian, dt=DT, nsteps=NSTEPS, evolve_config=build_evolve_config(),
+        observations=build_observation_operators(tree), observe_initial=OBSERVE_INITIAL,
+        observe_every=OBSERVE_EVERY, start_time=START_TIME, start_step=START_STEP,
+    )
+    expectations = {{ analysis_call }}
+    result = {"dt": DT, "nsteps": NSTEPS, "expectations": expectations,
+              "start_time": START_TIME, "start_step": START_STEP, "restart_plan": RESTART_PLAN}
+    result_path = Path(__file__).resolve().with_name("ttn_sbm_ft_result.json")
+    result_path.write_text(json.dumps(result, indent=2, allow_nan=False))
+    print(f"result_file={result_path}")
+    return state, result
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,9 @@
+QUANTUM_NUMBER = {{ quantum_number }}
+INITIAL_BOND_DIMENSION = {{ bond_dimension }}
+SECTOR_MIXING = {{ sector_mixing }}
+
+
+def create_initial_state(model, *, quantum_number=QUANTUM_NUMBER,
+                         bond_dimension=INITIAL_BOND_DIMENSION, sector_mixing=SECTOR_MIXING):
+    """A random MPS within the chosen electron-number sector, using Reno's RNG."""
+    return Mps.random(model, quantum_number, bond_dimension, percent=sector_mixing)
